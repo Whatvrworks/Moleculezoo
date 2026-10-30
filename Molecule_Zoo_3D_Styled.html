@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Molecule Zoo 3D: build a molecule, hatch a creature</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Build molecules in real 3D, press Run to watch them move, and hatch every one into a creature.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--ink:#0B1020;--panel:rgba(30,39,71,.82);--mint:#4DF2C0;--amber:#FFB84D;--coral:#FF5C70;--ice:#6EC8FF;--text:#EAF0FF;--dim:#B6C0E0;--head:Fredoka,"Trebuchet MS",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace;box-sizing:border-box}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--ink);color:var(--text);font:15px/1.4 Inter,system-ui,sans-serif;overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+button{font:inherit;color:var(--text);background:var(--panel);border:1px solid rgba(77,242,192,.35);border-radius:999px;padding:10px 16px;min-height:44px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--mint);box-shadow:0 0 18px rgba(77,242,192,.3)}
+button:disabled{opacity:.4;cursor:default}
+button.go{background:var(--mint);color:#06281f;border-color:var(--mint);font-weight:600}
+#hud{position:fixed;top:0;left:0;right:0;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 0;pointer-events:none}
+#f{font:600 34px var(--head);letter-spacing:.5px}
+#nm{color:var(--dim);font-family:var(--mono);font-size:13px}
+#tip{margin-top:8px;max-width:520px;color:var(--amber);font-size:14px;min-height:20px}
+#dock{position:fixed;left:0;right:0;bottom:0;display:flex;flex-direction:column;gap:8px;padding:12px 12px calc(12px + env(safe-area-inset-bottom,0px))}
+#shelf,#bar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center}
+#shelf button{width:52px;height:52px;border-radius:50%;padding:0;font:600 18px var(--head)}
+#bar label{display:flex;gap:8px;align-items:center;background:var(--panel);border-radius:999px;padding:0 14px;min-height:44px;font-family:var(--mono);font-size:13px}
+#bar input{accent-color:var(--coral);width:120px}
+#ex{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center;color:var(--dim);font-size:13px}
+#ex button{min-height:36px;padding:6px 14px;font-family:var(--mono)}
+#hero[hidden]{display:none}
+.card{background:var(--panel);border-radius:16px;padding:12px;margin:10px 0}
+.card b{font:600 18px var(--head)}
+.card small{display:block;color:var(--dim);font-family:var(--mono)}
+.sw{display:inline-block;width:14px;height:14px;border-radius:50%;margin-right:3px;vertical-align:-2px}
+#hero{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;background:radial-gradient(ellipse at center,#141B34,#0B1020);z-index:8}
+#hero h1{font:600 clamp(34px,7vw,64px)/1.05 var(--head);margin:0 0 12px;text-shadow:0 0 30px rgba(77,242,192,.4)}
+#hero p{color:var(--dim);max-width:460px;margin:0 0 22px;font-size:17px}
+#hero small{margin-top:14px;color:var(--dim)}
+#toast{position:fixed;left:50%;top:38%;transform:translate(-50%,0);font:600 26px var(--head);color:var(--mint);opacity:0;transition:opacity .3s;pointer-events:none;text-shadow:0 0 20px rgba(77,242,192,.6);z-index:6}
+#toast.on{opacity:1}
+.ch{padding:6px 12px;min-height:36px;font-size:13px;margin:3px}.ch.el{opacity:.25;text-decoration:line-through}.ch.sel{border-color:var(--amber);color:var(--amber)}
+.lg{font-family:var(--mono);font-size:13px;margin:6px 0}
+#vsh,#pts,#cs{width:100%;background:var(--panel);color:var(--text);border:1px solid rgba(77,242,192,.35);border-radius:12px;padding:8px;font:13px var(--mono)}
+#rack{position:fixed;top:0;right:0;bottom:0;width:clamp(230px,36vw,340px);z-index:6;background:rgba(14,19,40,.97);border-left:1px solid rgba(77,242,192,.3);padding:calc(12px + env(safe-area-inset-top,0px)) 12px 12px;overflow:auto;box-shadow:-12px 0 40px rgba(0,0,0,.45)}
+#rack[hidden],#cat[hidden],#vial[hidden],#rail[hidden],#zc[hidden]{display:none}
+.rh{display:flex;justify-content:space-between;align-items:center;font:600 20px var(--head);margin-bottom:8px}.rh button{min-height:36px;padding:4px 12px}
+#pti{color:var(--dim);font-size:12px;min-height:34px;margin:6px 0}
+#rack details{margin:8px 0;background:var(--panel);border-radius:14px;overflow:hidden}
+#rack summary{cursor:pointer;padding:10px 12px;list-style:none;display:flex;align-items:center;gap:8px;font:600 15px var(--head)}
+#rack summary i{width:6px;height:22px;border-radius:3px}#rack summary small{margin-left:auto;color:var(--dim);font:12px var(--mono)}
+.jars{display:flex;flex-wrap:wrap;gap:6px;padding:0 10px 10px}.jar{width:44px;height:44px;border-radius:50%;padding:0;font:600 14px var(--head)}
+#cat{position:fixed;left:0;right:0;bottom:0;z-index:7;height:min(46vh,380px);background:rgba(14,19,40,.98);border-top:1px solid rgba(77,242,192,.3);border-radius:22px 22px 0 0;padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;box-shadow:0 -12px 40px rgba(0,0,0,.45)}
+.cth{display:flex;align-items:center;gap:10px;font:600 20px var(--head)}.cth span{color:var(--dim);font:12px var(--mono)}.cth button{margin-left:auto;min-height:36px;padding:4px 12px}
+#ctabs{display:flex;gap:6px;overflow-x:auto;flex:0 0 auto}#ctabs .ch{white-space:nowrap}
+#cl{display:flex;gap:10px;overflow-x:auto;flex:1;padding-bottom:4px;scroll-snap-type:x mandatory}
+.mc{flex:0 0 150px;scroll-snap-align:start;border-radius:16px;min-height:0;text-align:left;align-items:flex-start;display:flex;flex-direction:column;gap:6px;padding:10px}.mc b{font:600 22px var(--mono)}.mc span{font-size:13px}.mc small{color:var(--dim);font:11px var(--mono)}
+.dots{display:flex;flex-wrap:wrap;gap:3px}.dots i{width:9px;height:9px;border-radius:50%}
+#vial{position:fixed;inset:0;z-index:20;background:var(--ink);overflow:auto;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.dos{max-width:720px;margin:0 auto;border:2px dashed rgba(255,184,77,.5);border-radius:18px;padding:16px;background:rgba(255,184,77,.04)}
+.dh{display:flex;justify-content:space-between;align-items:flex-start}.dh small{letter-spacing:3px;color:var(--amber);font:12px var(--mono)}.dos h2{font:600 28px var(--head);margin:2px 0 8px}.dos p{color:var(--dim);margin:0 0 8px}
+.tubes{display:flex;gap:10px;margin:10px 0}
+.tube{width:44px;height:96px;border:2px solid rgba(182,192,224,.5);border-radius:6px 6px 22px 22px;position:relative;overflow:hidden;display:flex;align-items:flex-end;justify-content:center}
+.tube i{position:absolute;left:0;right:0;bottom:0;height:0;transition:height .5s}.tube.f i{height:70%}.tube b{position:relative;margin-bottom:6px;font-size:20px}
+.tools{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
+.tt{border-radius:14px;min-height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px;font-size:12px}.tt b{font-size:22px}
+.lineup{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.sus{border-radius:12px;min-height:0;padding:8px;display:flex;flex-direction:column;align-items:flex-start}.sus b{font:600 16px var(--mono)}.sus small{color:var(--dim);font-size:11px}
+.sus.out{opacity:.25}.sus.sel{border-color:var(--amber);box-shadow:0 0 14px rgba(255,184,77,.4)}
+.stamp{display:inline-block;transform:rotate(-6deg);border:3px solid var(--mint);color:var(--mint);padding:4px 12px;font:600 22px var(--head);border-radius:8px}
+#rail{position:fixed;left:8px;top:140px;bottom:270px;width:58px;display:flex;flex-direction:column;gap:10px;overflow:auto;z-index:4;padding:4px}
+.orb{width:46px;height:46px;border-radius:50%;padding:0;position:relative;flex:0 0 auto;border:2px solid rgba(255,255,255,.4);animation:bob 3s ease-in-out infinite}
+.orb i{position:absolute;top:14px;width:9px;height:9px;border-radius:50%;background:#fff;box-shadow:inset -2px -2px 0 #0B1020}.orb i:first-child{left:9px}.orb i:last-child{right:9px}
+@keyframes bob{50%{transform:translateY(-4px)}}@media(prefers-reduced-motion:reduce){.orb{animation:none}}
+#zc{position:fixed;left:72px;top:140px;max-width:min(300px,calc(100vw - 90px));z-index:5;background:var(--panel);backdrop-filter:blur(6px);border:1px solid rgba(77,242,192,.35);border-radius:16px;padding:12px}
+#hero h1{margin:18px 0 6px}
+.spin{width:84px;height:84px;border-radius:50%;border:4px solid rgba(77,242,192,.18);border-top-color:var(--mint);border-right-color:var(--ice);animation:spin 1s linear infinite;position:relative}
+.spin b{position:absolute;inset:26px;border-radius:50%;background:var(--mint);box-shadow:0 0 26px var(--mint);animation:pulse 1.4s ease-in-out infinite}
+@keyframes spin{to{transform:rotate(360deg)}}@keyframes pulse{50%{transform:scale(.7);opacity:.6}}
+@media(prefers-reduced-motion:reduce){.spin{animation-duration:3s}.spin b{animation:none}}
+#hero{transition:opacity .4s}
+#tut{position:fixed;inset:0;z-index:9;pointer-events:none}#tut[hidden]{display:none}
+#sp{position:fixed;border-radius:16px;box-shadow:0 0 0 9999px rgba(5,8,18,.72),0 0 0 3px var(--mint),0 0 24px var(--mint);pointer-events:none;transition:all .35s}
+#tc{position:fixed;left:12px;right:12px;max-width:430px;margin:0 auto;background:rgba(14,19,40,.98);border:1px solid var(--mint);border-radius:18px;padding:14px;pointer-events:auto;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+#tc small{color:var(--mint);font:12px var(--mono);letter-spacing:2px}#tc b{display:block;font:600 22px var(--head);margin:4px 0}#tc p{margin:0 0 10px;color:var(--text)}
+.tr{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}.tr button{min-height:40px;padding:6px 16px}.tr button[hidden]{display:none}
+#rail{background:rgba(14,19,40,.6);border:1px solid rgba(77,242,192,.25);border-radius:16px;scrollbar-width:none;align-items:center;width:64px;top:150px}#rail::-webkit-scrollbar{display:none}
+.rt{font:600 11px var(--mono);color:var(--mint);text-align:center;letter-spacing:2px;flex:0 0 auto}.rt small{color:var(--dim);letter-spacing:0;font-size:9px}
+.zi{display:flex;flex-direction:column;align-items:center;gap:2px;flex:0 0 auto}.zi small{font-size:9px;color:var(--dim);max-width:56px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#zc{top:150px}
+#hb{min-width:44px;padding:10px}
+
+#rail{width:112px;top:120px;bottom:250px;gap:14px;padding:10px 6px}
+.rt{font-size:14px}.rt small{font-size:11px}
+.orb{background:none;border:none;width:50px;height:50px}.orb svg{display:block}
+.zi small{font-size:12px;max-width:100px;white-space:normal;text-align:center;line-height:1.15;color:var(--text)}
+#zc{left:132px;top:110px;width:min(460px,calc(100vw - 144px));max-height:calc(100vh - 130px);overflow:auto;padding:16px;border-radius:20px;background:rgba(14,19,40,.97)}
+.zh{display:flex;align-items:center;gap:12px}.zh>div{flex:1}.zn{font:600 24px var(--head)}.zh small{display:block;color:var(--dim);font:12px var(--mono)}.zh button{min-height:36px;padding:4px 12px}
+#zc h4{margin:14px 0 6px;color:var(--mint);font:600 12px var(--mono);letter-spacing:2px;text-transform:uppercase}#zc p{margin:0 0 10px}
+.svw{background:rgba(255,255,255,.04);border-radius:14px;padding:6px}.sv{width:100%;height:auto;display:block}.dm{color:var(--dim)}
+.it{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:10px}.it th{text-align:left;color:var(--dim);font-weight:500;padding:6px 8px 6px 0;width:34%;vertical-align:top}.it td{padding:6px 0}.it tr{border-bottom:1px solid rgba(255,255,255,.07)}
+button i.fa-solid{margin-right:4px}#shelf button i,.rh button i,.zh button i,#vx i{margin:0}
+.qw{max-width:760px;margin:0 auto}.qh{display:flex;justify-content:space-between;align-items:center;font:600 26px var(--head);margin-bottom:10px}#vx[hidden]{display:none}
+.qd,.qc p{color:var(--dim)}.qg{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:12px 0}
+.qc{background:var(--panel);border:1px solid rgba(77,242,192,.25);border-radius:18px;padding:14px}.qc h3{font:600 20px var(--head);margin:0 0 6px}.qn{display:flex;gap:6px;margin:8px 0}
+.qt{display:flex;justify-content:space-between;align-items:center;font:600 15px var(--mono);margin-bottom:8px}.tm{font:600 36px var(--head);color:var(--mint)}.tm.dg{color:var(--coral);animation:blink .6s infinite alternate}
+.sk{color:var(--dim)}.sk.hot{color:var(--amber)}
+.pb{height:8px;background:rgba(255,255,255,.08);border-radius:9px;overflow:hidden;margin-bottom:16px}.pb i{display:block;height:100%;width:0;background:var(--mint);transition:width .3s}
+.qq{font:500 21px/1.4 var(--head);margin:0 0 14px}
+.qos{display:grid;gap:8px}.qo{display:flex;gap:12px;align-items:center;text-align:left;border-radius:14px;padding:10px 14px}.qo b{width:30px;height:30px;border-radius:50%;background:rgba(77,242,192,.15);display:grid;place-items:center;font:600 14px var(--mono);flex:0 0 auto}
+.qo.ok{background:rgba(77,242,192,.22);border-color:var(--mint);opacity:1}.qo.bad{background:rgba(255,92,112,.22);border-color:var(--coral);opacity:1}
+.fb{margin:12px 0;padding:10px 12px;border-radius:12px}.fb.g{background:rgba(77,242,192,.12)}.fb.r{background:rgba(255,92,112,.14)}.qx{margin-top:16px}
+.rg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:14px 0}.rg div{background:var(--panel);border-radius:16px;padding:14px;color:var(--dim);font-size:13px}.rg b{display:block;font:600 34px var(--head);color:var(--text)}.rg b.gg{color:var(--mint)}.rg b.rr{color:var(--coral)}.nw{color:var(--amber)}
+.qwarn{display:none;text-align:center;color:var(--coral);font:600 16px var(--head);letter-spacing:2px;margin-bottom:6px}
+#vial.danger{background:#25080f}#vial.danger .qwarn{display:block;animation:blink .5s infinite alternate}
+#vial.danger::after{content:'';position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 150px 40px rgba(255,92,112,.65);animation:dng .7s ease-in-out infinite alternate}
+@keyframes blink{to{opacity:.35}}@keyframes dng{to{box-shadow:inset 0 0 220px 70px rgba(255,40,70,.9)}}
+@media(prefers-reduced-motion:reduce){#vial.danger::after,.tm.dg,#vial.danger .qwarn{animation:none}}
+
+/* ===== Refinement: fixed lab stage + quiz visual system ===== */
+#c{z-index:0}
+#hud{z-index:2}
+#dock{z-index:3}
+#rail{z-index:4}
+#zc{z-index:5}
+#rack,#cat,#vial{z-index:20}
+#tut{z-index:30}
+#toast{z-index:25}
+#dock button,#dock label{position:relative;transform:none!important}
+#dock button:active{transform:none!important}
+#vial{background:
+ radial-gradient(ellipse at 12% 5%,rgba(77,242,192,.12),transparent 34%),
+ radial-gradient(ellipse at 88% 90%,rgba(110,200,255,.10),transparent 38%),
+ #0B1020}
+#vial .qw{max-width:900px}
+#vial .qh{position:sticky;top:calc(-16px - env(safe-area-inset-top,0px));z-index:3;padding:12px 0 14px;background:linear-gradient(#0B1020 72%,transparent);backdrop-filter:blur(12px)}
+#vial .qh>span{display:flex;align-items:center;gap:10px}
+#vial .qh>span>i{display:grid;place-items:center;width:42px;height:42px;border-radius:14px;color:var(--mint);background:rgba(77,242,192,.12);border:1px solid rgba(77,242,192,.28)}
+.qintro{display:flex;align-items:center;gap:14px;padding:16px;border:1px solid rgba(77,242,192,.2);border-radius:20px;background:linear-gradient(120deg,rgba(77,242,192,.1),rgba(110,200,255,.055));margin:8px 0 18px}
+.qintro .qseal{width:58px;height:58px;flex:0 0 58px;border-radius:18px;display:grid;place-items:center;background:rgba(77,242,192,.12);color:var(--mint);font-size:27px}
+.qintro p{margin:3px 0 0;color:var(--dim);font-size:13px}
+.qmode{position:relative;overflow:hidden;min-height:230px;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.qmode:after{content:"";position:absolute;width:150px;height:150px;border:1px solid rgba(77,242,192,.12);border-radius:50%;right:-42px;top:-52px;box-shadow:0 0 0 18px rgba(77,242,192,.025),0 0 0 38px rgba(77,242,192,.02);pointer-events:none}
+.qmode.timed{border-color:rgba(255,92,112,.32);background:linear-gradient(145deg,rgba(255,92,112,.13),rgba(30,39,71,.88) 55%)}
+.qmode.relaxed{border-color:rgba(110,200,255,.3);background:linear-gradient(145deg,rgba(110,200,255,.12),rgba(30,39,71,.88) 55%)}
+.qmode h3{display:flex;align-items:center;gap:9px}
+.qmode h3 i{color:var(--mint)}
+.qmode.timed h3 i{color:var(--coral)}
+.qmode .qtag{font:11px var(--mono);letter-spacing:1.4px;color:var(--dim);text-transform:uppercase}
+.qmode .qn{margin:auto 0 2px}
+.qmode .go{margin-top:6px;min-width:150px}
+.qrecord{margin-top:18px;padding:16px;border:1px solid rgba(255,184,77,.2);border-radius:18px;background:rgba(255,184,77,.045)}
+.qrecord h3{font:600 19px var(--head);margin:0 0 8px;color:var(--amber)}
+.qrecord .it{margin:0}
+.qrecord .it tr:last-child{border:0}
+.qplayhead{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:rgba(30,39,71,.85);border:1px solid rgba(77,242,192,.2);margin-bottom:14px}
+.qplayhead .qcount{font:12px var(--mono);color:var(--dim)}
+.qplayhead .tm{font-size:38px;line-height:1}
+.qstreak{font:600 14px var(--mono);color:var(--amber);white-space:nowrap}
+.qquestion{position:relative;overflow:hidden;padding:clamp(18px,4vw,30px);border-radius:22px;border:1px solid rgba(77,242,192,.28);background:radial-gradient(circle at 100% 0,rgba(77,242,192,.11),transparent 40%),linear-gradient(135deg,rgba(30,39,71,.96),rgba(15,24,47,.96));box-shadow:0 16px 50px rgba(0,0,0,.22)}
+.qquestion:before{content:"MOLECULE IDENTIFICATION";display:block;color:var(--mint);font:11px var(--mono);letter-spacing:2px;margin-bottom:14px}
+.qquestion .qq{max-width:760px;font-size:clamp(21px,3vw,28px);margin:0 0 22px}
+.qos{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:10px}
+.qo{min-height:60px;border:1px solid rgba(182,192,224,.18);background:rgba(30,39,71,.78);transition:background .18s,border-color .18s}
+.qo:hover:not(:disabled){transform:translateY(-1px);background:rgba(77,242,192,.08)}
+.qo b{width:34px;height:34px;color:var(--mint);background:rgba(77,242,192,.12);border:1px solid rgba(77,242,192,.2)}
+.qo span{font-weight:600}
+.qo.ok b{background:var(--mint);color:#06281f}
+.qo.bad b{background:var(--coral);color:#260910}
+.qfbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:16px}
+.qfbar .fb{flex:1;margin:0}
+.qwarn{padding:10px;border:1px solid rgba(255,92,112,.5);border-radius:12px;background:rgba(255,92,112,.12)}
+.qresult{padding:clamp(18px,4vw,30px);border-radius:22px;border:1px solid rgba(77,242,192,.25);background:radial-gradient(circle at 100% 0,rgba(77,242,192,.12),transparent 42%),var(--panel)}
+.qresult h2{font:600 clamp(28px,5vw,40px) var(--head)}
+.qresult .rg div{border:1px solid rgba(182,192,224,.12);background:rgba(11,16,32,.42)}
+.qresult .rg b{font-size:clamp(30px,5vw,42px)}
+.qresult .qn{flex-wrap:wrap}
+.qx{border-color:rgba(255,92,112,.28);color:#ffc0c8}
+@media(max-width:560px){#vial{padding-left:12px;padding-right:12px}.qintro{align-items:flex-start}.qintro .qseal{width:46px;height:46px;flex-basis:46px}.qplayhead{flex-wrap:wrap}.qmode{min-height:210px}}
+
+
+
+/* ===== Unified Molecule Zoo interface: match the quiz visual language ===== */
+:root{
+ --panel:rgba(25,35,65,.88);
+ --panel-strong:rgba(17,26,51,.96);
+ --line:rgba(77,242,192,.22);
+ --line-soft:rgba(182,192,224,.14);
+}
+body{
+ background:
+  radial-gradient(ellipse at 10% 8%,rgba(77,242,192,.07),transparent 30%),
+  radial-gradient(ellipse at 90% 88%,rgba(110,200,255,.07),transparent 34%),
+  var(--ink);
+}
+button{
+ border:1px solid var(--line);
+ background:linear-gradient(145deg,rgba(37,49,83,.94),rgba(22,31,58,.94));
+ box-shadow:0 5px 18px rgba(0,0,0,.12);
+ transition:border-color .18s,background .18s,box-shadow .18s,opacity .18s;
+}
+button:hover:not(:disabled){
+ border-color:var(--mint);
+ background:linear-gradient(145deg,rgba(48,72,95,.98),rgba(25,43,67,.98));
+ box-shadow:0 0 0 1px rgba(77,242,192,.08),0 8px 24px rgba(0,0,0,.22),0 0 18px rgba(77,242,192,.12);
+}
+button.go{
+ background:linear-gradient(115deg,#4DF2C0,#8BECCF);
+ color:#06281f;border-color:#4DF2C0;
+ box-shadow:0 7px 22px rgba(77,242,192,.15);
+}
+button.go:hover:not(:disabled){background:linear-gradient(115deg,#75f6d0,#a3f3dc);box-shadow:0 0 24px rgba(77,242,192,.24)}
+button:focus-visible,input:focus-visible,summary:focus-visible{
+ outline:2px solid var(--ice);outline-offset:3px;
+}
+input:not([type=range]){
+ min-height:42px;padding:9px 13px;border-radius:12px;
+ color:var(--text);background:rgba(11,16,32,.68);
+ border:1px solid var(--line-soft);font:13px var(--mono);
+}
+input:not([type=range]):focus{border-color:var(--mint);box-shadow:0 0 0 3px rgba(77,242,192,.08)}
+input::placeholder{color:rgba(182,192,224,.62)}
+#hud{
+ padding-top:calc(16px + env(safe-area-inset-top,0px));
+}
+#f{text-shadow:0 0 26px rgba(77,242,192,.22)}
+#nm{letter-spacing:.4px}
+#tip{
+ padding:8px 12px;border:1px solid rgba(255,184,77,.18);
+ border-radius:12px;background:rgba(20,27,49,.72);
+ backdrop-filter:blur(10px);width:fit-content;
+}
+#dock{
+ padding:12px 14px calc(14px + env(safe-area-inset-bottom,0px));
+ background:linear-gradient(180deg,transparent,rgba(7,12,27,.84) 28%);
+}
+#shelf button{
+ background:linear-gradient(145deg,rgba(38,55,87,.96),rgba(20,31,57,.96));
+ border:1px solid rgba(110,200,255,.24);
+ box-shadow:0 5px 18px rgba(0,0,0,.22);
+}
+#shelf button:hover:not(:disabled){border-color:var(--ice);box-shadow:0 0 18px rgba(110,200,255,.18)}
+#bar label{
+ border:1px solid var(--line);background:rgba(25,35,65,.9);
+ box-shadow:0 5px 18px rgba(0,0,0,.16);backdrop-filter:blur(12px);
+}
+#bar input{accent-color:var(--mint)}
+#ex{padding:7px 10px;border-radius:14px;background:rgba(11,16,32,.56);border:1px solid var(--line-soft);backdrop-filter:blur(10px)}
+#ex button{background:rgba(30,39,71,.9)}
+#hero{
+ background:
+  radial-gradient(circle at 50% 40%,rgba(77,242,192,.12),transparent 28%),
+  radial-gradient(ellipse at center,#141D38,#0B1020 72%);
+}
+#hero h1{text-shadow:0 0 34px rgba(77,242,192,.34)}
+#hero p{line-height:1.6}
+#rack,#cat,#zc{
+ background:
+  radial-gradient(ellipse at 100% 0,rgba(77,242,192,.08),transparent 42%),
+  linear-gradient(155deg,rgba(18,27,53,.98),rgba(11,16,32,.98));
+ border-color:rgba(77,242,192,.22);
+ box-shadow:0 18px 55px rgba(0,0,0,.42),0 0 32px rgba(77,242,192,.045);
+ backdrop-filter:blur(18px);
+}
+.rh,.cth{
+ padding-bottom:10px;border-bottom:1px solid var(--line-soft);
+}
+.rh,.cth,.zn{color:var(--text)}
+.rh span,.cth{letter-spacing:.2px}
+#pti,.dm,#zc .dm{line-height:1.55}
+#rack details{
+ border:1px solid var(--line-soft);
+ background:linear-gradient(145deg,rgba(35,47,79,.78),rgba(17,26,51,.86));
+}
+#rack details[open]{border-color:rgba(77,242,192,.28);box-shadow:inset 0 0 22px rgba(77,242,192,.035)}
+#rack summary{min-height:46px}
+#rack summary:hover{background:rgba(77,242,192,.055)}
+.jar{box-shadow:none;border-width:1px}
+.jar:hover:not(:disabled){transform:translateY(-2px)}
+#cat{border-radius:24px 24px 0 0}
+#ctabs{padding:2px 0 6px}
+#ctabs .ch{background:rgba(30,39,71,.72);border-color:var(--line-soft)}
+#ctabs .ch.sel{background:rgba(77,242,192,.14);border-color:var(--mint);color:var(--mint)}
+.mc{
+ background:linear-gradient(145deg,rgba(37,49,82,.96),rgba(17,26,51,.96));
+ border:1px solid rgba(110,200,255,.2);
+ box-shadow:0 8px 22px rgba(0,0,0,.16);
+ transition:transform .18s,border-color .18s,box-shadow .18s;
+}
+.mc:hover{transform:translateY(-3px);border-color:var(--mint);box-shadow:0 12px 28px rgba(0,0,0,.24),0 0 18px rgba(77,242,192,.09)}
+.mc b{color:var(--mint)}
+.card{
+ border:1px solid var(--line-soft);
+ background:linear-gradient(145deg,rgba(37,49,82,.9),rgba(17,26,51,.92));
+ box-shadow:0 8px 24px rgba(0,0,0,.16);
+}
+#rail{background:linear-gradient(180deg,rgba(13,21,43,.78),rgba(13,21,43,.42));border:1px solid var(--line-soft);border-radius:22px;backdrop-filter:blur(12px)}
+.orb{box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.zi small{font-family:var(--mono);letter-spacing:-.2px}
+#zc{border:1px solid var(--line);border-radius:22px}
+.zh{padding-bottom:12px;border-bottom:1px solid var(--line-soft)}
+#zc h4{display:flex;align-items:center;gap:8px}
+#zc h4:before{content:"";width:18px;height:2px;background:var(--mint);border-radius:2px;box-shadow:0 0 10px rgba(77,242,192,.45)}
+.svw{border:1px solid var(--line-soft);background:rgba(11,16,32,.45)}
+.it tr{border-color:var(--line-soft)}
+.it th{color:#9EACD2}
+#tc{
+ background:
+  radial-gradient(circle at 100% 0,rgba(77,242,192,.1),transparent 42%),
+  linear-gradient(145deg,rgba(25,35,65,.98),rgba(11,16,32,.98));
+ border-color:rgba(77,242,192,.42);
+ box-shadow:0 20px 60px rgba(0,0,0,.55),0 0 24px rgba(77,242,192,.08);
+}
+#sp{box-shadow:0 0 0 9999px rgba(5,8,18,.76),0 0 0 2px var(--mint),0 0 26px rgba(77,242,192,.7)}
+#toast{filter:drop-shadow(0 0 12px rgba(77,242,192,.4))}
+#vial,#rack,#cat,#zc,#tc{scrollbar-color:rgba(77,242,192,.35) rgba(11,16,32,.35);scrollbar-width:thin}
+#vial::-webkit-scrollbar,#rack::-webkit-scrollbar,#cat::-webkit-scrollbar,#zc::-webkit-scrollbar{width:8px;height:8px}
+#vial::-webkit-scrollbar-thumb,#rack::-webkit-scrollbar-thumb,#cat::-webkit-scrollbar-thumb,#zc::-webkit-scrollbar-thumb{background:rgba(77,242,192,.28);border-radius:8px}
+@media(max-width:700px){
+ #dock{padding-left:8px;padding-right:8px}
+ #bar{gap:6px}
+ #bar label{padding:0 10px}
+ #bar input{width:82px}
+ #bar button{padding:8px 11px;font-size:13px}
+ #rail{left:5px;width:88px}
+ #zc{left:100px;width:calc(100vw - 112px)}
+}
+@media(prefers-reduced-motion:reduce){
+ .mc,.jar,.button{transition:none}
+ .mc:hover,.jar:hover{transform:none}
+}
+
+</style></head>
+<body>
+<canvas id="c"></canvas>
+<header id="hud"><div id="f">–</div><div id="nm">Empty bench</div><div id="tip"></div></header>
+<div id="dock"><div id="ex"></div><div id="shelf"></div>
+<div id="bar"><button id="run"><i class="fa-solid fa-play"></i> Run</button><label title="Heat = energi panas simulasi. Efeknya aktif saat Run: atom bergerak makin acak, berpijar, ikatan meregang/merah, dan ikatan lemah bisa putus."><i class="fa-solid fa-temperature-half"></i> Heat <input id="T" type="range" min="0" max="3000" value="300"><span id="Tv">300 K · Hangat</span></label><button id="hatch" class="go" disabled><i class="fa-solid fa-egg"></i> Hatch</button><button id="clr"><i class="fa-solid fa-trash"></i> Clear</button><button id="hb" aria-label="Bantuan"><i class="fa-solid fa-circle-question"></i></button><button id="ptb"><i class="fa-solid fa-table-cells"></i> Tabel Periodik</button><button id="ctb"><i class="fa-solid fa-book-open"></i> Katalog</button><button id="vb"><i class="fa-solid fa-flask-vial"></i> Quiz Molekul</button><button id="zb"><i class="fa-solid fa-paw"></i> Zoo (0)</button></div></div>
+<nav id='rail' hidden></nav><div id='zc' hidden></div>
+<aside id='rack' hidden><div class='rh'><span>Rak Elemen</span><button id='ptx' aria-label='Tutup'><i class="fa-solid fa-xmark"></i></button></div><input id='pts' placeholder='Cari elemen'><p id='pti'>Buka satu laci, lalu ketuk elemen untuk menaruh atomnya di bangku. Semua 118 elemen terbuka.</p><div id='ptg'></div></aside>
+<section id='cat' hidden><div class='cth'>Katalog Molekul <span id='cn'></span><button id='cx' aria-label='Tutup'><i class="fa-solid fa-xmark"></i></button></div><input id='cs' placeholder='Cari nama atau rumus'><div id='ctabs'></div><div id='cl'></div></section>
+<section id='vial' hidden><div class='qw'><div class='qh'><span><i class="fa-solid fa-flask-vial"></i> Quiz Molekul</span><button id='vx' aria-label='Tutup'><i class="fa-solid fa-xmark"></i></button></div><div id='qb'></div></div></section>
+<section id="hero"><div class='spin'><b></b></div><h1>Molecule Zoo 3D</h1><p>Menyiapkan laboratorium…</p></section>
+<div id='tut' hidden><div id='sp'></div><div id='tc'><small id='ts'></small><b id='tt'></b><p id='tp'></p><div class='tr'><button id='tsk'>Lewati tutorial</button><button id='thp' hidden>Bantu aku</button><button id='tnx' class='go' hidden>Lanjut</button></div></div></div>
+<div id="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(()=>{
+const $=id=>document.getElementById(id),cl=(x,a,b)=>Math.min(b,Math.max(a,x));
+const V={H:[1],C:[4],N:[3],O:[2],S:[2,4,6],Cl:[1]};
+const E={H:{c:0xF5F8FF,r:.38,m:1,n:'Hydrogen'},C:{c:0x7A8199,r:.62,m:12,n:'Carbon'},N:{c:0x4D7CFF,r:.58,m:14,n:'Nitrogen'},O:{c:0xFF4D5E,r:.55,m:16,n:'Oxygen'},S:{c:0xF2D13C,r:.8,m:32,n:'Sulfur'},Cl:{c:0x3FD16A,r:.78,m:35.5,n:'Chlorine'}};
+const DB={H2O:['Wobble','Water','H₂O','Bengkok 104,5° dan suka menempel. Air paling padat pada 4 °C, makanya es mengapung.'],
+CO2:['Frost','Carbon dioxide','CO₂','Lurus sempurna, dan es kering langsung berubah jadi gas.'],
+CH4:['Tetra','Methane','CH₄','Tetrahedron mungil bersudut 109,5°, inti gas alam.'],
+H3N:['Ammy','Ammonia','NH₃','Piramida yang terbalik seperti payung miliaran kali per detik.'],
+H2:['Pip','Hydrogen','H₂','Molekul paling ringan, dan yang paling hiperaktif.'],
+O2:['Azure','Oxygen','O₂','Oksigen cair berwarna biru pucat dan menempel pada magnet.'],
+N2:['Stoic','Nitrogen','N₂','Ikatan rangkap tiga yang begitu kuat sampai hampir tak ada yang bisa menggesernya.'],
+ClH:['Zing','Hydrogen chloride','HCl','Dalam air ia menjadi asam klorida, asam di lambungmu.'],
+H2S:['Stinker','Hydrogen sulfide','H₂S','Berbau telur busuk, dan lebih bengkok daripada air.'],
+C2H4:['Ripe','Ethylene','C₂H₄','Gas yang mematangkan buah.'],
+C2H2:['Torch','Acetylene','C₂H₂','Garis lurus dengan ikatan rangkap tiga, cukup panas untuk memotong baja.'],
+C2H6:['Twin','Ethane','C₂H₆','Dua gugus metil berputar mengelilingi satu ikatan.'],
+O2S:['Hiss','Sulfur dioxide','SO₂','Gas gunung berapi di balik hujan asam.']};
+const sub=s=>s.replace(/\d+/g,m=>[...m].map(d=>'₀₁₂₃₄₅₆₇₈₉'[d]).join(''));
+const R=new THREE.WebGLRenderer({canvas:$('c'),antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));
+const S=new THREE.Scene();S.background=new THREE.Color(0x0B1020);S.fog=new THREE.Fog(0x0B1020,9,24);
+const cam=new THREE.PerspectiveCamera(50,1,.1,60);
+S.add(new THREE.HemisphereLight(0xBFD4FF,0x141B34,.9));
+const L1=new THREE.PointLight(0xFFE2B0,1.1,40);L1.position.set(5,6,6);S.add(L1);
+const L2=new THREE.PointLight(0x4DF2C0,.7,40);L2.position.set(-6,-3,-5);S.add(L2);
+const rs=()=>{R.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()};addEventListener('resize',rs);rs();
+const dg=new THREE.BufferGeometry(),dp=new Float32Array(600);for(let i=0;i<600;i++)dp[i]=(Math.random()-.5)*18;
+dg.setAttribute('position',new THREE.BufferAttribute(dp,3));const dust=new THREE.Points(dg,new THREE.PointsMaterial({size:.04,color:0x6EC8FF,transparent:true,opacity:.5}));S.add(dust);
+const SG=new THREE.SphereGeometry(1,32,24),CG=new THREE.CylinderGeometry(.07,.07,1,10),Y=new THREE.Vector3(0,1,0);
+const atoms=[],bonds=[];let eyes=[],cur=null,alive=false,running=false,T=300,drag=null,th=.6,ph=1.25,rad=innerWidth<innerHeight?11:8;
+const calm=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let zoo={};try{zoo=JSON.parse(localStorage.getItem('mz3d')||'{}')}catch(e){}
+const sum=a=>a.bonds.reduce((s,o)=>s+o.o,0),mx=a=>V[a.el][V[a.el].length-1];
+const getB=(a,b)=>a.bonds.find(o=>o.a===b||o.b===b);
+function addAtom(el,p){const c=E[el].c,m=new THREE.Mesh(SG,new THREE.MeshStandardMaterial({color:c,roughness:.25,metalness:.1,emissive:c,emissiveIntensity:.2}));m.scale.setScalar(E[el].r);m.position.copy(p);S.add(m);const a={el,m,v:new THREE.Vector3(),f:new THREE.Vector3(),bonds:[]};m.userData.a=a;atoms.push(a);return a}
+function setOrder(o,n){o.o=n;o.ms.forEach(m=>S.remove(m));o.ms=[];for(let i=0;i<n;i++){const m=new THREE.Mesh(CG,o.mat);S.add(m);o.ms.push(m)}}
+function mkBond(a,b){const o={a,b,o:1,ms:[],stress:0,mat:new THREE.MeshStandardMaterial({color:0xB6C0E0,roughness:.4,emissive:0x6EC8FF,emissiveIntensity:.15})};bonds.push(o);a.bonds.push(o);b.bonds.push(o);setOrder(o,1);return o}
+function rmBond(o){o.ms.forEach(m=>S.remove(m));bonds.splice(bonds.indexOf(o),1);o.a.bonds.splice(o.a.bonds.indexOf(o),1);o.b.bonds.splice(o.b.bonds.indexOf(o),1)}
+function clearAll(){atoms.forEach(a=>S.remove(a.m));bonds.forEach(o=>o.ms.forEach(m=>S.remove(m)));atoms.length=0;bonds.length=0;eyes=[];alive=false;refresh()}
+const restLen=o=>(E[o.a.el].r+E[o.b.el].r)*.85*[1,.88,.8][o.o-1];
+function ideal(c,n){const e=c.el;if(e==='O')return 104.5;if(e==='S')return 92;if(e==='N')return n===3?107:n===2?120:109.5;if(e==='C')return n===2?180:n===3?120:109.5;return 0}
+const d=new THREE.Vector3(),mid=new THREE.Vector3(),nd=new THREE.Vector3(),pp=new THREE.Vector3(),UP=new THREE.Vector3(0,0,1),coral=new THREE.Color(0xFF5C70),base=new THREE.Color(0xB6C0E0);
+function physics(){
+ for(const a of atoms){a.f.set(0,0,0);a.f.addScaledVector(a.m.position,-.01)}
+ const brk=[];
+ for(const o of bonds){d.subVectors(o.b.m.position,o.a.m.position);const l=d.length()||1e-4,L=restLen(o);o.stress=Math.abs(l-L)/L;d.multiplyScalar((l-L)*.25/l);o.a.f.add(d);o.b.f.sub(d);if(Math.random()<bp(o))brk.push(o)}
+ for(const c of atoms){const nb=c.bonds.map(o=>o.a===c?o.b:o.a);if(nb.length<2)continue;const th0=ideal(c,nb.length);if(!th0)continue;
+  for(let i=0;i<nb.length;i++)for(let j=i+1;j<nb.length;j++){const A=nb[i],B=nb[j],La=restLen(getB(c,A)),Lb=restLen(getB(c,B));const tg=Math.sqrt(La*La+Lb*Lb-2*La*Lb*Math.cos(th0*Math.PI/180));d.subVectors(B.m.position,A.m.position);const l=d.length()||1e-4;d.multiplyScalar((l-tg)*.12/l);A.f.add(d);B.f.sub(d)}}
+ for(let i=0;i<atoms.length;i++)for(let j=i+1;j<atoms.length;j++){const A=atoms[i],B=atoms[j];if(getB(A,B))continue;d.subVectors(B.m.position,A.m.position);const l=d.length()||1e-4,mn=(E[A.el].r+E[B.el].r)*1.5;if(l<mn){d.multiplyScalar((mn-l)*.15/l);A.f.sub(d);B.f.add(d)}}
+ const k=running?.035*Math.sqrt(T/300):alive?.003:0;
+ for(const a of atoms){if(a===drag){a.v.set(0,0,0);continue}const s=k/Math.sqrt(E[a.el].m/8);a.v.x+=(Math.random()-.5)*s;a.v.y+=(Math.random()-.5)*s;a.v.z+=(Math.random()-.5)*s;a.v.add(a.f).multiplyScalar(.8);a.m.position.add(a.v)}
+ if(brk.length){brk.forEach(rmBond);refresh();toast('Ikatan putus! Molekulnya terurai')}
+}
+function updBonds(){for(const o of bonds){const A=o.a.m.position,B=o.b.m.position;d.subVectors(B,A);const l=d.length();mid.addVectors(A,B).multiplyScalar(.5);nd.copy(d).normalize();pp.crossVectors(d,UP);if(pp.lengthSq()<1e-6)pp.set(1,0,0);pp.normalize();
+ o.mat.color.copy(base).lerp(coral,cl(o.stress*1.5,0,1));o.ms.forEach((m,i)=>{m.position.copy(mid).addScaledVector(pp,(i-(o.o-1)/2)*.16);m.quaternion.setFromUnitVectors(Y,nd);m.scale.set(1,l,1)})}}
+function analyzeOld(){if(!atoms.length)return null;const ok=atoms.every(a=>V[a.el].includes(sum(a)));const seen=new Set([atoms[0]]),st=[atoms[0]];
+ while(st.length){const x=st.pop();for(const o of x.bonds){const y=o.a===x?o.b:o.a;if(!seen.has(y)){seen.add(y);st.push(y)}}}
+ const cnt={};atoms.forEach(a=>cnt[a.el]=(cnt[a.el]||0)+1);let ks=Object.keys(cnt).sort();if(cnt.C)ks=['C',...(cnt.H?['H']:[]),...ks.filter(k=>k!=='C'&&k!=='H')];
+ return{ok:ok&&seen.size===atoms.length,key:ks.map(k=>k+(cnt[k]>1?cnt[k]:'')).join('')}}
+function refresh(){eyes.forEach(g=>g.parent&&g.parent.remove(g));eyes=[];alive=false;cur=analyze();
+ $('f').textContent=cur?(DB[cur.key]?DB[cur.key][2]:cur.L.length===1&&cur.L[0].lib?cur.L[0].lib.pf:sub(cur.key)):'–';
+ $('nm').textContent=!cur?'Bangku kosong':!cur.sat?'Valensi belum penuh (tetap bisa menetas)':cur.L.length>1?cur.L.length+' molekul siap menetas':cur.L[0].lib?cur.L[0].lib.name:DB[cur.key]?DB[cur.key][1]:'Molekul belum dikenal';
+ $('hatch').disabled=!(cur&&cur.ok);if(cur&&cur.sat)tip('Lengkap! Tekan Hatch untuk bertemu makhlukmu.')}
+function tip(t){$('tip').textContent=t}
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),1800)}
+function snap(a,e){const near=atoms.filter(b=>b!==a&&a.m.position.distanceTo(b.m.position)<(E[a.el].r+E[b.el].r)*2.1).sort((p,q)=>a.m.position.distanceTo(p.m.position)-a.m.position.distanceTo(q.m.position));
+ let tgt=null;const fv=x=>mx(x)-sum(x);near.sort((p,q)=>fv(q)-fv(p)||a.m.position.distanceTo(p.m.position)-a.m.position.distanceTo(q.m.position));if(e){setNdc(e);ray.setFromCamera(ndc,cam);const hs=ray.intersectObjects(atoms.filter(x=>x!==a).map(x=>x.m)).filter(h=>a.m.position.distanceTo(h.object.position)<4.5).map(h=>h.object.userData.a).sort((p,q)=>fv(q)-fv(p));tgt=hs[0]||null}
+ if(!near.length&&!tgt)return;const b=tgt||near.find(x=>sum(x)<mx(x))||near[0],ex=getB(a,b);
+ if(sum(a)<mx(a)&&sum(b)<mx(b)){if(ex){if(ex.o<3)setOrder(ex,ex.o+1);else return}else mkBond(a,b);refresh()}
+ else{const f=sum(a)>=mx(a)?a:b;tip(mx(f)===0?`${E[f.el].n} tidak membentuk ikatan stabil di sini.`:`${E[f.el].n} sudah penuh: ia hanya mau ${mx(f)} ikatan, jadi ikatan baru tidak punya tempat.`);d.subVectors(a.m.position,b.m.position).normalize();a.v.addScaledVector(d,.25)}}
+function addEyes(cm){const hub=cm.reduce((b,a)=>a.bonds.length>b.bonds.length||(a.bonds.length===b.bonds.length&&E[a.el].m>E[b.el].m)?a:b);
+ const g=new THREE.Group(),wm=new THREE.MeshBasicMaterial({color:0xffffff}),bm=new THREE.MeshBasicMaterial({color:0x0B1020});
+ [-1,1].forEach(s=>{const e=new THREE.Mesh(SG,wm);e.scale.setScalar(.24);e.position.set(s*.36,.22,.88);const p=new THREE.Mesh(SG,bm);p.scale.setScalar(.12);p.position.set(s*.36,.22,1.08);g.add(e,p)});
+ hub.m.add(g);eyes.push(g);alive=true}
+function save(){try{localStorage.setItem('mz3d',JSON.stringify(zoo))}catch(e){}}
+function renderZoo(){const ks=Object.keys(zoo);$('zb').textContent=`Zoo (${ks.length})`;
+ $('zl').innerHTML=ks.length?ks.map(k=>{const z=zoo[k];return`<div class="card"><b>${z.d[0]}</b> <small>${z.d[1]} · ${z.d[2]}</small><div style="margin:6px 0">${z.cols.map(c=>`<span class="sw" style="background:#${c.toString(16).padStart(6,'0')}"></span>`).join('')}</div><span style="color:var(--dim)">${z.d[3]}</span></div>`}).join(''):'<p style="color:var(--dim)">Nothing hatched yet. Build a molecule and press Hatch.</p>'}
+$('hatch').onclick=()=>{if(!cur||!cur.ok||alive)return;hatchAll();return;const dd=DB[cur.key]||['Wild one','Wild Hatchling',sub(cur.key),'Belum ada di buku panduan, tapi ia mengikuti aturan yang sama, jadi makhluknya kami buat dari aturan itu.'];
+ addEyes();toast(dd[0]+' menetas!');zoo[cur.key]={d:dd,cols:atoms.map(a=>E[a.el].c).filter((c,i,r)=>r.indexOf(c)===i)};save();renderZoo()};
+$('run').onclick=()=>{running=!running;$('run').innerHTML=running?'<i class="fa-solid fa-stop"></i> Stop':'<i class="fa-solid fa-play"></i> Run';tip(running?'Heat mengatur energi gerak atom saat Run aktif. Makin tinggi nilainya, atom makin acak dan berpijar; ikatan meregang, memerah, lalu ikatan yang lebih lemah berpeluang putus. Ikatan rangkap tiga lebih tahan.':'')};
+const tl=()=>T<250?'Beku':T<600?'Hangat':T<1200?'Panas':T<1800?'Sangat panas':'Ekstrem';$('T').oninput=e=>{T=+e.target.value;$('Tv').textContent=T+' K · '+tl()};
+$('clr').onclick=clearAll;
+const sh=$('shelf');Object.keys(E).forEach(el=>{const b=document.createElement('button');b.textContent=el;b.title=E[el].n;b.style.borderColor='#'+E[el].c.toString(16).padStart(6,'0');
+ b.onclick=()=>{addAtom(el,new THREE.Vector3((Math.random()-.5)*3.2,(Math.random()-.5)*3,(Math.random()-.5)*1.5));refresh()};sh.appendChild(b)});
+function startPlay(){clearAll();['O','H','H'].forEach(e=>addAtom(e,new THREE.Vector3((Math.random()-.5)*3.2,(Math.random()-.5)*3,(Math.random()-.5)*1.5)));refresh();tip('Tarik satu atom sampai dekat atom lain agar menempel, atau tekan Bangun cepat di bawah.')};
+const REC={H2O:['O',['H','H'],1],CO2:['C',['O','O'],2],CH4:['C',['H','H','H','H'],1],H3N:['N',['H','H','H'],1]};
+function build(k){clearAll();const[c,l,o]=REC[k],C=addAtom(c,new THREE.Vector3(0,0,0));l.forEach((e,i)=>{const A=addAtom(e,new THREE.Vector3(Math.cos(i*2)*1.6,Math.sin(i*2.3)*1.2,Math.sin(i*1.7)));const b=mkBond(C,A);if(o>1)setOrder(b,o)});refresh()}
+const ex=$('ex');ex.append('Bangun cepat:');[['H2O','H₂O'],['CO2','CO₂'],['CH4','CH₄'],['H3N','NH₃']].forEach(([k,t])=>{const b=document.createElement('button');b.textContent=t;b.onclick=()=>build(k);ex.appendChild(b)});
+const P=new Map(),ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),plane=new THREE.Plane(),hit=new THREE.Vector3(),wd=new THREE.Vector3();
+const setNdc=e=>ndc.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);
+const cv=$('c');
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);P.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(P.size===1){setNdc(e);ray.setFromCamera(ndc,cam);const h=ray.intersectObjects(atoms.map(a=>a.m))[0];if(h){drag=h.object.userData.a;cam.getWorldDirection(wd);plane.setFromNormalAndCoplanarPoint(wd,drag.m.position)}}else drag=null});
+cv.addEventListener('pointermove',e=>{const p=P.get(e.pointerId);if(!p)return;
+ if(P.size===2){const o=[...P.values()],d0=Math.hypot(o[0].x-o[1].x,o[0].y-o[1].y);p.x=e.clientX;p.y=e.clientY;const d1=Math.hypot(o[0].x-o[1].x,o[0].y-o[1].y);if(d1>0)rad=cl(rad*d0/d1,4,18);return}
+ const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
+ if(drag){setNdc(e);ray.setFromCamera(ndc,cam);if(ray.ray.intersectPlane(plane,hit))drag.m.position.copy(hit)}else{th-=dx*.006;ph=cl(ph-dy*.006,.2,Math.PI-.2)}});
+const up=e=>{P.delete(e.pointerId);if(drag){const a=drag;drag=null;snap(a,e)}};
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+cv.addEventListener('wheel',e=>{rad=cl(rad*(1+e.deltaY*.001),4,18)},{passive:true});
+const VD='Air|H₂O|cair|sedang|bercampur|netral|tidak|tidak terbakar|tanpa bau|acuan (sama dengan air)|lemah|Wobble;Karbon dioksida|CO₂|gas|sangat rendah|larut sedikit|asam|tidak|memadamkan api|tanpa bau|turun di udara|lemah|Frost;Metana|CH₄|gas|sangat rendah|tidak larut|netral|tidak|terbakar, nyala biru|tanpa bau|naik di udara|tidak|Tetra;Amonia|NH₃|gas|sangat rendah|larut banyak|basa|tidak|sulit terbakar|tajam menyengat|naik di udara|lemah|Ammy;Hidrogen|H₂|gas|sangat rendah|tidak larut|netral|tidak|terbakar, nyala biru pucat|tanpa bau|naik cepat di udara|tidak|Pip;Oksigen|O₂|gas|sangat rendah|larut sedikit|netral|tertarik sangat lemah|membuat api lebih terang|tanpa bau|turun sedikit di udara|tidak|Azure;Nitrogen|N₂|gas|sangat rendah|tidak larut|netral|tidak|memadamkan api|tanpa bau|setara udara|tidak|Stoic;Hidrogen klorida|HCl|gas|sangat rendah|larut banyak|asam|tidak|tidak terbakar|tajam menusuk|turun di udara|menghantar baik|Zing;Hidrogen sulfida|H₂S|gas|sangat rendah|larut sedikit|asam|tidak|terbakar, nyala biru|telur busuk|turun di udara|lemah|Stinker;Etilena|C₂H₄|gas|sangat rendah|larut sedikit|netral|tidak|terbakar, nyala kuning terang|samar manis|setara udara|tidak|Ripe;Belerang dioksida|SO₂|gas|sangat rendah|larut banyak|asam|tidak|tidak terbakar|tajam menyesakkan|turun di udara|lemah|Hiss;Etanol|C₂H₅OH|cair|rendah|bercampur|netral|tidak|terbakar, nyala biru pucat|harum alkohol|lebih ringan dari air|tidak|Spirit;Aseton|C₃H₆O|cair|rendah|bercampur|netral|tidak|terbakar, nyala kuning|manis menyengat|lebih ringan dari air|tidak|Solvo;Asam asetat|CH₃COOH|cair|sedang|bercampur|asam|tidak|sulit terbakar|asam tajam seperti cuka|sedikit lebih berat dari air|lemah|Tang;Merkuri|Hg|cair|sedang|tidak larut|netral|tidak|tidak terbakar|tanpa bau|jauh lebih berat dari air|menghantar sangat baik|Quick;Glukosa|C₆H₁₂O₆|padat|tinggi|larut baik|netral|tidak|hangus, menghitam|tanpa bau|sedikit lebih berat dari air|tidak|Gluco;Garam dapur|NaCl|padat|tinggi|larut baik|netral|tidak|nyala kuning|tanpa bau|jauh lebih berat dari air|menghantar baik|Brick;Kapur|CaCO₃|padat|tinggi|tidak larut|basa|tidak|nyala jingga-merah|tanpa bau|jauh lebih berat dari air|tidak|Chalk;Soda kue|NaHCO₃|padat|tinggi|larut baik|basa|tidak|nyala kuning|tanpa bau|jauh lebih berat dari air|menghantar baik|Puff;Besi|Fe|padat|tinggi|tidak larut|netral|tertarik kuat|berpijar, memercik|tanpa bau|jauh lebih berat dari air|menghantar sangat baik|Rivet;Tembaga|Cu|padat|tinggi|tidak larut|netral|tidak|nyala hijau-biru|tanpa bau|jauh lebih berat dari air|menghantar sangat baik|Verdi;Magnesium|Mg|padat|tinggi|tidak larut|netral|tidak|nyala putih menyilaukan|tanpa bau|sedikit lebih berat dari air|menghantar sangat baik|Flare;Belerang|S|padat|sedang|tidak larut|netral|tidak|terbakar, nyala biru|hampir tanpa bau|jauh lebih berat dari air|tidak|Crown;Yodium|I₂|padat|sedang|larut sedikit|netral|tidak|tidak terbakar, uap ungu|bau obat khas|jauh lebih berat dari air|tidak|Violet'.split(';').map(r=>r.split('|'));
+function hill(comp){const c={};comp.forEach(x=>c[x.el]=(c[x.el]||0)+1);let ks=Object.keys(c).sort();if(c.C)ks=['C',...(c.H?['H']:[]),...ks.filter(k=>k!=='C'&&k!=='H')];return ks.map(k=>k+(c[k]>1?c[k]:'')).join('')}
+function planFix(){const ord=new Map(bonds.map(o=>[o,o.o])),s=a=>a.bonds.reduce((t,o)=>t+ord.get(o),0),sat=a=>V[a.el].includes(s(a));
+ for(let g=0;g<40;g++){let ch=false;for(const o of bonds){if(ord.get(o)<3&&(!sat(o.a)||!sat(o.b))&&s(o.a)<mx(o.a)&&s(o.b)<mx(o.b)){ord.set(o,ord.get(o)+1);ch=true}}if(!ch)break}
+ return{ord,sat}}
+function applyFix(ord){let ch=false;ord.forEach((n,o)=>{if(n>o.o){setOrder(o,n);ch=true}});return ch}
+function comps(){const seen=new Set(),out=[];for(const a of atoms){if(seen.has(a))continue;const c=[a],st=[a];seen.add(a);while(st.length){const x=st.pop();for(const o of x.bonds){const y=o.a===x?o.b:o.a;if(!seen.has(y)){seen.add(y);c.push(y);st.push(y)}}}out.push(c)}return out}
+function analyze(){if(!atoms.length)return null;const p=planFix(),L=comps().map(c=>({c,ok:c.every(x=>p.sat(x)),key:hill(c),lib:c.every(x=>p.sat(x))?libOf(c):null}));return{ok:true,sat:L.every(m=>m.ok),L,fix:p.ord,key:L.map(m=>m.key).join('+')}}
+function hatchAll(){const ch=applyFix(cur.fix),names=[];
+ cur.L.forEach(m=>{const dd=m.ok?(DB[m.key]||m.lib&&[m.lib.name,m.lib.name,m.lib.pf,m.lib.fact]||['Wild one','Wild Hatchling',sub(m.key),'Belum ada di buku panduan, tapi ia mengikuti aturan yang sama, jadi makhluknya kami buat dari aturan itu.']):['Wild one','Radikal liar',sub(m.key)+'•','Valensinya belum penuh, jadi ia gelisah dan mencari pasangan. Molekul seperti ini nyata di alam dan sangat reaktif.'];
+  const zk=m.lib?'L'+m.lib.id:m.key;addCreature(m.c,zk);names.push(dd[0]);zoo[zk]={st:mkSt(m.c),d:dd,lid:m.lib?m.lib.id:null,cols:m.c.map(a=>E[a.el].c).filter((c,i,r)=>r.indexOf(c)===i)}});
+ toast(names.join(' + ')+' menetas!');save();renderZoo();if(ch)tip('Ikatan rangkap ditambahkan otomatis agar valensi terpenuhi.')}
+const EL="H1 He0 Li1 Be2 B3 C4 N3 O2 F1 Ne0 Na1 Mg2 Al3 Si4 P35 S246 Cl1 Ar0 K1 Ca2 Sc3 Ti4 V2345 Cr236 Mn247 Fe23 Co23 Ni2 Cu12 Zn2 Ga3 Ge4 As35 Se246 Br1 Kr0 Rb1 Sr2 Y3 Zr4 Nb5 Mo246 Tc0 Ru34 Rh3 Pd2 Ag1 Cd2 In3 Sn24 Sb35 Te246 I1 Xe246 Cs1 Ba2 La3 Ce34 Pr3 Nd3 Pm0 Sm3 Eu23 Gd3 Tb3 Dy3 Ho3 Er3 Tm3 Yb23 Lu3 Hf4 Ta5 W6 Re7 Os48 Ir34 Pt24 Au13 Hg12 Tl13 Pb24 Bi35 Po0 At0 Rn0 Fr0 Ra0 Ac0 Th0 Pa0 U0 Np0 Pu0 Am0 Cm0 Bk0 Cf0 Es0 Fm0 Md0 No0 Lr0 Rf0 Db0 Sg0 Bh0 Hs0 Mt0 Ds0 Rg0 Cn0 Nh0 Fl0 Mc0 Lv0 Ts0 Og0".split(' '),NM="Hydrogen,Helium,Lithium,Beryllium,Boron,Carbon,Nitrogen,Oxygen,Fluorine,Neon,Sodium,Magnesium,Aluminium,Silicon,Phosphorus,Sulfur,Chlorine,Argon,Potassium,Calcium,Scandium,Titanium,Vanadium,Chromium,Manganese,Iron,Cobalt,Nickel,Copper,Zinc,Gallium,Germanium,Arsenic,Selenium,Bromine,Krypton,Rubidium,Strontium,Yttrium,Zirconium,Niobium,Molybdenum,Technetium,Ruthenium,Rhodium,Palladium,Silver,Cadmium,Indium,Tin,Antimony,Tellurium,Iodine,Xenon,Caesium,Barium,Lanthanum,Cerium,Praseodymium,Neodymium,Promethium,Samarium,Europium,Gadolinium,Terbium,Dysprosium,Holmium,Erbium,Thulium,Ytterbium,Lutetium,Hafnium,Tantalum,Tungsten,Rhenium,Osmium,Iridium,Platinum,Gold,Mercury,Thallium,Lead,Bismuth,Polonium,Astatine,Radon,Francium,Radium,Actinium,Thorium,Protactinium,Uranium,Neptunium,Plutonium,Americium,Curium,Berkelium,Californium,Einsteinium,Fermium,Mendelevium,Nobelium,Lawrencium,Rutherfordium,Dubnium,Seaborgium,Bohrium,Hassium,Meitnerium,Darmstadtium,Roentgenium,Copernicium,Nihonium,Flerovium,Moscovium,Livermorium,Tennessine,Oganesson".split(','),MS="1.008 4.003 6.94 9.012 10.81 12.011 14.007 15.999 18.998 20.180 22.990 24.305 26.982 28.085 30.974 32.06 35.45 39.948 39.098 40.078 44.956 47.867 50.942 51.996 54.938 55.845 58.933 58.693 63.546 65.38 69.723 72.630 74.922 78.971 79.904 83.798 85.468 87.62 88.906 91.224 92.906 95.95 98 101.07 102.91 106.42 107.87 112.41 114.82 118.71 121.76 127.60 126.90 131.29 132.91 137.33 138.91 140.12 140.91 144.24 145 150.36 151.96 157.25 158.93 162.50 164.93 167.26 168.93 173.05 174.97 178.49 180.95 183.84 186.21 190.23 192.22 195.08 196.97 200.59 204.38 207.2 208.98 209 210 222 223 226 227 232.04 231.04 238.03 237 244 243 247 247 251 252 257 258 259 266 267 268 269 270 277 278 281 282 285 286 289 290 293 294 294".split(' ').map(Number),symOf=[''];
+const FC=[0xC69BFF,0x9ABF7A,0x8FB4D9,0x9FB2C0,0x7DD3C0,0xE8D58A,0xB8F25A,0xFFB38A,0xFFC2E0,0xFF9AA8],FN=['Logam alkali','Alkali tanah','Logam transisi','Logam pasca-transisi','Metaloid','Nonlogam','Halogen','Gas mulia','Lantanida','Aktinida'];
+const fam=z=>[3,11,19,37,55,87].includes(z)?0:[4,12,20,38,56,88].includes(z)?1:[2,10,18,36,54,86,118].includes(z)?7:[9,17,35,53,85,117].includes(z)?6:[5,14,32,33,51,52].includes(z)?4:[1,6,7,8,15,16,34].includes(z)?5:z>=57&&z<=71?8:z>=89&&z<=103?9:[13,31,49,50,81,82,83,84,113,114,115,116].includes(z)?3:2;
+const pos=z=>z<3?[1,z===1?1:18]:z<11?[2,z<5?z-2:z+8]:z<19?[3,z<13?z-10:z]:z<37?[4,z-18]:z<55?[5,z-36]:z<57?[6,z-54]:z<72?[9,z-54]:z<87?[6,z-68]:z<89?[7,z-86]:z<104?[10,z-86]:[7,z-100];
+EL.forEach((t,i)=>{const z=i+1,s=t.match(/[A-Z][a-z]?/)[0],ds=t.slice(s.length).split('').map(Number),pr=z<3?0:z<11?1:z<19?2:z<37?3:z<55?4:z<87?5:6;symOf[z]=s;V[s]=ds[0]===0?[0]:ds;
+ if(!E[s])E[s]={c:FC[fam(z)],r:[.38,.58,.8,.9,1,1.1,1.15][pr],m:MS[i]/2.2,n:NM[i]};E[s].z=z;E[s].M=MS[i];E[s].rad=z===43||z===61||z>=84});
+const shexp=s=>{let h=5381;for(let i=0;i<s.length;i++)h=(h*33^s.charCodeAt(i))>>>0;return h.toString(36)};
+function shash(els,adj){let L=els.map(shexp);for(let r=0;r<4;r++)L=L.map((l,i)=>shexp(l+'('+adj[i].map(j=>L[j]).sort().join(',')+')'));return shexp(L.slice().sort().join('|'))+els.length}
+function smi(s){const A=[],B=[],st=[],rg={};let prev=-1,o=1,i=0;
+ while(i<s.length){const c=s[i];
+  if(c==='('){st.push(prev);i++}else if(c===')'){prev=st.pop();i++}else if(c==='='){o=2;i++}else if(c==='#'){o=3;i++}
+  else if(c>='0'&&c<='9'){if(rg[c]!==undefined){B.push([rg[c],prev,1]);delete rg[c]}else rg[c]=prev;i++}
+  else{let el,h=-1;if(c==='['){const j=s.indexOf(']',i),m=s.slice(i+1,j).match(/^([A-Z][a-z]?)(?:H(\d*))?$/);el=m[1];h=m[2]===undefined?0:+(m[2]||1);i=j+1}else{el=s.slice(i).match(/^(Cl|Br|[BCNOPSFI])/)[1];i+=el.length}
+   A.push({el,h});const k=A.length-1;if(prev>=0)B.push([prev,k,o]);prev=k;o=1}}
+ A.forEach((a,k)=>{if(a.h<0){const sm=B.reduce((t,b)=>t+((b[0]===k||b[1]===k)?b[2]:0),0),v=V[a.el].find(x=>x>=sm);a.h=v===undefined?0:v-sm}});
+ const n=A.length;for(let k=0;k<n;k++)for(let t=0;t<A[k].h;t++){A.push({el:'H',h:0});B.push([k,A.length-1,1])}
+ return{A,B}}
+const LH={},LL=[];
+"Hydrogen|[H][H];Water|O;Hydrogen peroxide|OO;Oxygen|O=O;Nitrogen|N#N;Ammonia|N;Hydrogen chloride|Cl;Hydrogen bromide|Br;Hydrogen iodide|I;Hydrogen sulfide|S;Carbon dioxide|O=C=O;Sulfur dioxide|O=S=O;Sulfur trioxide|O=S(=O)=O;Carbon disulfide|S=C=S;Carbonyl sulfide|O=C=S;Chlorine|ClCl;Bromine|BrBr;Iodine|II;Fluorine|FF;Sulfuric acid|OS(O)(=O)=O;Phosphoric acid|OP(O)(O)=O;Boric acid|OB(O)O;Boron trifluoride|FB(F)F;Sulfur hexafluoride|FS(F)(F)(F)(F)F;Xenon difluoride|F[Xe]F;Xenon tetrafluoride|F[Xe](F)(F)F;Sodium chloride|[Na]Cl;Potassium chloride|[K]Cl;Lithium chloride|[Li]Cl;Sodium fluoride|[Na]F;Sodium bromide|[Na]Br;Potassium iodide|[K]I;Sodium hydroxide|[Na]O;Potassium hydroxide|[K]O;Magnesium chloride|Cl[Mg]Cl;Calcium chloride|Cl[Ca]Cl;Magnesium oxide|[Mg]=O;Calcium oxide|[Ca]=O;Magnesium hydroxide|O[Mg]O;Calcium hydroxide|O[Ca]O;Aluminum chloride|Cl[Al](Cl)Cl;Aluminum oxide|O=[Al]O[Al]=O;Iron(III) oxide|O=[Fe]O[Fe]=O;Iron(II) oxide|[Fe]=O;Copper(II) oxide|[Cu]=O;Zinc oxide|[Zn]=O;Titanium dioxide|O=[Ti]=O;Silver chloride|[Ag]Cl;Calcium carbonate|O=C1O[Ca]O1;Sodium bicarbonate|OC(=O)O[Na];Sodium carbonate|[Na]OC(=O)O[Na];Sodium sulfate|[Na]OS(=O)(=O)O[Na];Methane|C;Ethane|CC;Propane|CCC;Butane|CCCC;Pentane|CCCCC;Hexane|CCCCCC;Octane|CCCCCCCC;Isobutane|CC(C)C;Ethylene|C=C;Propene|CC=C;Butadiene|C=CC=C;Isoprene|CC(=C)C=C;Acetylene|C#C;Cyclopropane|C1CC1;Cyclopentane|C1CCCC1;Cyclohexane|C1CCCCC1;Vinyl chloride|C=CCl;Benzene|C1=CC=CC=C1;Toluene|CC1=CC=CC=C1;Ethylbenzene|CCC1=CC=CC=C1;o-Xylene|CC1=CC=CC=C1C;Styrene|C=CC1=CC=CC=C1;Phenol|OC1=CC=CC=C1;Aniline|NC1=CC=CC=C1;Benzaldehyde|O=CC1=CC=CC=C1;Benzoic acid|OC(=O)C1=CC=CC=C1;Benzyl alcohol|OCC1=CC=CC=C1;Chlorobenzene|ClC1=CC=CC=C1;Naphthalene|C1=CC2=CC=CC=C2C=C1;Pyridine|C1=CC=NC=C1;Pyrrole|C1=CNC=C1;Furan|C1=COC=C1;Methanol|CO;Ethanol|CCO;Propanol|CCCO;Isopropanol|CC(O)C;Butanol|CCCCO;Cyclohexanol|OC1CCCCC1;Ethylene glycol|OCCO;Glycerol|OCC(O)CO;Dimethyl ether|COC;Diethyl ether|CCOCC;Ethylene oxide|C1CO1;Tetrahydrofuran|C1CCOC1;Formaldehyde|C=O;Acetaldehyde|CC=O;Acetone|CC(C)=O;Cyclohexanone|O=C1CCCCC1;Methyl formate|COC=O;Methyl acetate|COC(C)=O;Ethyl acetate|CCOC(C)=O;Isoamyl acetate|CC(C)CCOC(C)=O;Dimethyl sulfoxide|CS(C)=O;Formic acid|C(=O)O;Acetic acid|CC(=O)O;Propionic acid|CCC(=O)O;Acrylic acid|C=CC(=O)O;Oxalic acid|OC(=O)C(=O)O;Malic acid|OC(CC(=O)O)C(=O)O;Lactic acid|CC(O)C(=O)O;Citric acid|OC(=O)CC(O)(CC(=O)O)C(=O)O;Palmitic acid|CCCCCCCCCCCCCCCC(=O)O;Ascorbic acid|OCC(O)C1OC(=O)C(O)=C1O;Methylamine|CN;Dimethylamine|CNC;Ethanolamine|NCCO;Urea|NC(N)=O;Thiourea|NC(N)=S;Acetamide|CC(N)=O;Acetonitrile|CC#N;Methanethiol|CS;Dimethyl sulfide|CSC;Chloromethane|CCl;Dichloromethane|ClCCl;Chloroform|ClC(Cl)Cl;Carbon tetrachloride|ClC(Cl)(Cl)Cl;Glycine|NCC(=O)O;Alanine|CC(N)C(=O)O;Serine|OCC(N)C(=O)O;Cysteine|SCC(N)C(=O)O;Valine|CC(C)C(N)C(=O)O;Leucine|CC(C)CC(N)C(=O)O;Lysine|NCCCCC(N)C(=O)O;Glutamic acid|NC(CCC(=O)O)C(=O)O;Phenylalanine|NC(CC1=CC=CC=C1)C(=O)O;Tyrosine|NC(CC1=CC=C(O)C=C1)C(=O)O;Glucose|OCC1OC(O)C(O)C(O)C1O;Fructose|OCC1(O)OCC(O)C(O)C1O;Sucrose|OCC1OC(CO)(OC2OC(CO)C(O)C(O)C2O)C(O)C1O;Adenine|NC1=NC=NC2=C1N=CN2;Thymine|CC1=CNC(=O)NC1=O;Cytosine|NC1=NC(=O)NC=C1;Guanine|NC1=NC2=C(N=CN2)C(=O)N1;Uracil|O=C1C=CNC(=O)N1;Caffeine|CN1C=NC2=C1C(=O)N(C)C(=O)N2C;Aspirin|CC(=O)OC1=CC=CC=C1C(=O)O;Paracetamol|CC(=O)NC1=CC=C(O)C=C1;Ibuprofen|CC(C)CC1=CC=C(C=C1)C(C)C(=O)O;Vanillin|COC1=CC(C=O)=CC=C1O;Menthol|CC(C)C1CCC(C)CC1O;Limonene|CC1=CCC(CC1)C(C)=C;Capsaicin|CC(C)C=CCCCCC(=O)NCC1=CC(OC)=C(O)C=C1;Dopamine|NCCC1=CC(O)=C(O)C=C1".split(';').forEach(t=>{const[n,sm]=t.split('|'),g=smi(sm),adj=g.A.map(()=>[]);g.B.forEach(([i,j])=>{adj[i].push(j);adj[j].push(i)});
+ const els=g.A.map(a=>a.el),hh=shash(els,adj),c={};els.forEach(e=>c[e]=(c[e]||0)+1);let ks=Object.keys(c).sort();if(c.C)ks=['C',...(c.H?['H']:[]),...ks.filter(k=>k!=='C'&&k!=='H')];
+ const hk=ks.map(k=>k+(c[k]>1?c[k]:'')).join('');const EN={H:2.2,B:2.04,N:3.04,O:3.44,F:3.98,Si:1.9,P:2.19,S:2.58,Cl:3.16,Br:2.96,I:2.66,Xe:2.6};if(!c.C){ks=ks.sort((a,b)=>(EN[a]||1)-(EN[b]||1));if(c.N&&c.H&&!c.O)ks=['N',...ks.filter(k=>k!=='N')]}else{const mt=ks.filter(k=>fam(E[k].z)<=3);if(mt.length)ks=[...mt,...ks.filter(k=>!mt.includes(k))]}const pf=sub(ks.map(k=>k+(c[k]>1?c[k]:'')).join('')),M=els.reduce((t,e)=>t+E[e].M,0),id=LL.length,L={id,name:n,pf,g,sm,hk,hash:hh,fact:n+' ('+pf+'): '+els.length+' atom, massa molar sekitar '+M.toFixed(1)+' g/mol.'};
+ if(!LH[hh])LH[hh]=L;LL.push(L)});
+function libOf(c){const ix=new Map(c.map((a,i)=>[a,i]));return LH[shash(c.map(a=>a.el),c.map(a=>a.bonds.map(o=>ix.get(o.a===a?o.b:o.a))))]||null}
+function spawn(el){addAtom(el,new THREE.Vector3((Math.random()-.5)*3.2,(Math.random()-.5)*3,(Math.random()-.5)*1.5));refresh()}
+function shelfAdd(el){if([...sh.children].some(b=>b.textContent===el))return;const b=document.createElement('button');b.textContent=el;b.title=E[el].n;b.style.borderColor='#'+E[el].c.toString(16).padStart(6,'0');b.onclick=()=>spawn(el);sh.appendChild(b)}
+function buildLib(L){clearAll();const pl=[],g=L.g,adj=g.A.map(()=>[]);g.B.forEach(([i,j,o])=>{adj[i].push(j);adj[j].push(i)});
+ const q=[0];pl[0]=new THREE.Vector3(0,0,0);for(let k=0;k<q.length;k++)for(const j of adj[q[k]])if(!pl[j]){pl[j]=pl[q[k]].clone().add(new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize().multiplyScalar(1.1));q.push(j)}
+ const at=g.A.map((a,i)=>addAtom(a.el,pl[i]||new THREE.Vector3()));g.B.forEach(([i,j,o])=>{const b=mkBond(at[i],at[j]);if(o>1)setOrder(b,o)});rad=Math.min(18,Math.max(rad,6+Math.sqrt(at.length)*2.2));refresh();tip(L.name+' dibangun. Bongkar dan susun ulang sesukamu, atau tekan Hatch.')}
+const hx=c=>c.toString(16).padStart(6,'0');
+let rackOn=false,shift=[0,0],ctab=0,railOff=false;
+function setShift(x,y){shift=[0,0];cam.clearViewOffset();cam.updateProjectionMatrix()}
+addEventListener('resize',()=>setShift(shift[0],shift[1]));
+function spawn(el){const k=rackOn?.55:1;addAtom(el,new THREE.Vector3((Math.random()-.5)*3.2*k,(Math.random()-.5)*3,(Math.random()-.5)*1.5));refresh()}
+const rg=$('ptg');
+rg.innerHTML=FN.map((n,f)=>{const zs=[];for(let z=1;z<=118;z++)if(fam(z)===f)zs.push(z);return `<details ${f===5?'open':''}><summary><i style='background:#${hx(FC[f])}'></i>${n}<small>${zs.length}</small></summary><div class='jars'>${zs.map(z=>`<button class='jar' data-z='${z}' title='${E[symOf[z]].n}' style='border-color:#${hx(E[symOf[z]].c)};background:#${hx(E[symOf[z]].c)}22'>${symOf[z]}</button>`).join('')}</div></details>`}).join('');
+rg.onclick=e=>{const b=e.target.closest('.jar');if(!b)return;const s=symOf[+b.dataset.z],x=E[s];spawn(s);shelfAdd(s);$('pti').textContent=`${s} · ${x.n} · Z ${x.z} · massa ${x.M} · valensi: ${V[s][0]?V[s].join(', '):'tidak berikatan di sini'} · ${FN[fam(x.z)]}${x.rad?' · radioaktif atau sintetis: hanya dilihat':''}`};
+$('pts').oninput=e=>{const q=e.target.value.toLowerCase().trim();rg.querySelectorAll('details').forEach(d=>{let n=0;d.querySelectorAll('.jar').forEach(b=>{const s=symOf[+b.dataset.z],m=!q||s.toLowerCase()===q||E[s].n.toLowerCase().includes(q);b.style.display=m?'':'none';n+=m});d.style.display=n?'':'none';if(q&&n)d.open=true})};
+function openRack(on){rackOn=on;if(on)$('cat').hidden=true;$('rack').hidden=!on;setShift(on?Math.round($('rack').offsetWidth/2):0,0)}
+const CT=[['Semua',()=>1],['Sederhana',l=>l.g.A.length<=7],['Garam & oksida',l=>l.g.A.some(a=>fam(E[a.el].z)<=3)],['Hidrokarbon',l=>l.g.A.every(a=>a.el==='C'||a.el==='H')],['Aromatik',l=>/\d/.test(l.sm)&&(l.sm.match(/=/g)||[]).length>=3],['Organik',l=>l.g.A.some(a=>a.el==='C')&&l.g.A.some(a=>a.el!=='C'&&a.el!=='H')],['Besar',l=>l.g.A.length>=25]];
+function crender(){const q=$('cs').value.toLowerCase().trim(),ls=LL.filter(l=>CT[ctab][1](l)&&(!q||l.name.toLowerCase().includes(q)||l.pf.toLowerCase().includes(q)));
+ $('cn').textContent=ls.length+' / '+LL.length;
+ $('ctabs').innerHTML=CT.map((t,i)=>`<button class='ch ${i===ctab?'sel':''}' data-t='${i}'>${t[0]}</button>`).join('');
+ $('cl').innerHTML=ls.map(l=>{const c={};l.g.A.forEach(a=>c[a.el]=(c[a.el]||0)+1);const dots=Object.keys(c).map(e=>`<i style='background:#${hx(E[e].c)}' title='${e}'></i>`.repeat(Math.min(c[e],6))).join('');return `<button class='mc' data-i='${l.id}'><b>${l.pf}</b><span>${l.name}</span><div class='dots'>${dots}</div><small>${l.g.A.length} atom</small></button>`}).join('')}
+function openCat(on){if(on&&!$('rack').hidden){rackOn=false;$('rack').hidden=true}$('cat').hidden=!on;setShift(0,on?Math.round($('cat').offsetHeight/2):0);if(on)crender()}
+$('cs').oninput=crender;$('ctabs').onclick=e=>{const b=e.target.closest('button');if(b){ctab=+b.dataset.t;crender()}};
+$('cl').onclick=e=>{const b=e.target.closest('button');if(!b)return;buildLib(LL[+b.dataset.i]);openCat(false)};
+$('ptb').onclick=()=>openRack($('rack').hidden);$('ptx').onclick=()=>openRack(false);$('ctb').onclick=()=>openCat($('cat').hidden);$('cx').onclick=()=>openCat(false);
+
+const BE={'H-H':436,'C-H':413,'H-O':463,'H-N':391,'Cl-H':431,'C-C':348,'C-O':358,'C-N':305,'H-S':339,'C-Cl':339,'O-O':146,'N-N':163},BE2={'C-C':614,'C-O':799,'C-N':615,'O-O':498,'O-S':523,'C-S':573},BE3={'C-C':839,'N-N':945,'C-N':891,'C-O':1072};
+const bTb=o=>{const k=[o.a.el,o.b.el].sort().join('-');return 5.5*(o.o===1?BE[k]||350:o.o===2?BE2[k]||600:BE3[k]||850)};
+const bp=o=>{if(!running)return 0;const r=T/bTb(o);return r>.35?Math.min(.08,(r-.35)*.018):0};
+const glow=()=>{const h=running?T/3000*.9:0;for(const a of atoms)a.m.material.emissiveIntensity=.2+h};
+const ENX={H:2.2,Li:.98,Be:1.57,B:2.04,C:2.55,N:3.04,O:3.44,F:3.98,Na:.93,Mg:1.31,Al:1.61,Si:1.9,P:2.19,S:2.58,Cl:3.16,K:.82,Ca:1,Ti:1.54,Fe:1.83,Cu:1.9,Zn:1.65,Br:2.96,Ag:1.93,I:2.66,Xe:2.6};
+const hn=q=>{let h=7;for(let i=0;i<q.length;i++)h=(h*31+q.charCodeAt(i))>>>0;return h};
+const PUP=[0x0B1020,0x1F6FEB,0x7A2BD6,0xC2410C],fx=(n,k=1)=>n.toFixed(k).replace('.',',');
+function trt(k){const h=hn(k);return{e:(h%4),a:0,m:(h>>6)%5,s:.8+((h>>9)%4)*.15,p:(h>>12)%4,g:(h>>15)%4}}
+function addCreature(cm,key){
+ const t=trt(key),hub=cm.reduce((b,a)=>a.bonds.length>b.bonds.length||(a.bonds.length===b.bonds.length&&E[a.el].m>E[b.el].m)?a:b);
+ const g=new THREE.Group(),eg=new THREE.Group(),white=new THREE.MeshBasicMaterial({color:0xffffff}),pupil=new THREE.MeshBasicMaterial({color:PUP[t.p]}),line=new THREE.MeshBasicMaterial({color:0x0B1020});
+ // Keep every hatchling as a clean, round molecule-face; only the expression changes.
+ const eyeX=t.e===0?.29:t.e===1?.38:t.e===2?.33:.25,eyeY=t.e===3?.28:.24,eyeScale=t.e===2?.19:.22;
+ [-1,1].forEach(side=>{
+  const e=new THREE.Mesh(SG,white);e.scale.set(eyeScale,eyeScale*(t.e===1?.72:1),.075);e.position.set(side*eyeX,eyeY,.91);eg.add(e);
+  const p=new THREE.Mesh(SG,pupil);p.scale.set(eyeScale*.48,eyeScale*.55,.045);p.position.set(side*eyeX+(t.g%2?.025:-.025),eyeY+(t.g===2?.035:0),.99);eg.add(p);
+ });
+ // Eyelids/eyebrows provide subtle, friendly differences without changing the round silhouette.
+ const browGeo=new THREE.BoxGeometry(.22,.035,.035);
+ if(t.m===1||t.m===4)[-1,1].forEach(side=>{const br=new THREE.Mesh(browGeo,line);br.position.set(side*eyeX,eyeY+eyeScale*.95,.98);br.rotation.z=side*(t.m===1?-.16:.12);eg.add(br)});
+ g.add(eg);
+ let mouth;
+ if(t.m===0){mouth=new THREE.Mesh(new THREE.TorusGeometry(.12,.025,6,18,Math.PI),line);mouth.rotation.z=Math.PI;mouth.position.set(0,-.13,.94)}
+ else if(t.m===1){mouth=new THREE.Mesh(new THREE.TorusGeometry(.075,.022,6,16,Math.PI),line);mouth.position.set(0,-.15,.94)}
+ else if(t.m===2){mouth=new THREE.Mesh(new THREE.CircleGeometry(.045,16),line);mouth.position.set(0,-.15,.95)}
+ else if(t.m===3){mouth=new THREE.Mesh(new THREE.BoxGeometry(.22,.025,.025),line);mouth.position.set(0,-.15,.94)}
+ else{mouth=new THREE.Mesh(new THREE.TorusGeometry(.11,.022,6,18,Math.PI),line);mouth.rotation.z=0;mouth.position.set(0,-.13,.94)}
+ g.add(mouth);g.userData.eg=eg;hub.m.add(g);eyes.push(g);alive=true
+}
+function cSVG(k,cols,sz){
+ const t=trt(k),c1='#'+hx(cols[0]),c2='#'+hx(cols[1]||cols[0]),id='g'+hn(k),p='#'+hx(PUP[t.p]);
+ let o=`<svg viewBox="0 0 100 100" width="${sz}" height="${sz}" aria-hidden="true"><defs><radialGradient id="${id}" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset=".45" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></radialGradient></defs><circle cx="50" cy="52" r="40" fill="url(#${id})"/>`;
+ const ex=t.e,ey=ex===0?52:ex===1?54:ex===2?50:48,dx=ex===0?12:ex===1?17:ex===2?14:10,er=ex===2?8:7;
+ [-1,1].forEach(side=>{
+  const x=50+side*dx;
+  if(ex===3)o+=`<path d="M${x-7} ${ey} Q${x} ${ey-7} ${x+7} ${ey}" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+  else o+=`<ellipse cx="${x}" cy="${ey}" rx="${er}" ry="${ex===1?5:8}" fill="#fff"/>`;
+  o+=`<circle cx="${x+(t.g%2?2:-2)}" cy="${ey+1}" r="${ex===2?3.5:3.8}" fill="${p}"/>`;
+ });
+ if(t.m===0)o+='<path d="M40 73 Q50 83 60 73" stroke="#0B1020" stroke-width="3.5" fill="none" stroke-linecap="round"/>';
+ else if(t.m===1)o+='<path d="M41 76 Q50 68 59 76" stroke="#0B1020" stroke-width="3" fill="none" stroke-linecap="round"/>';
+ else if(t.m===2)o+='<ellipse cx="50" cy="75" rx="4" ry="5" fill="#0B1020"/>';
+ else if(t.m===3)o+='<path d="M40 74 H60" stroke="#0B1020" stroke-width="3.5" stroke-linecap="round"/>';
+ else o+='<path d="M40 72 Q50 78 60 72" stroke="#0B1020" stroke-width="3" fill="none" stroke-linecap="round"/>';
+ return o+'</svg>'
+}
+function mkSt(c){const ix=new Map(c.map((a,i)=>[a,i])),B=[];c.forEach(a=>a.bonds.forEach(o=>{if(o.a===a)B.push([ix.get(o.a),ix.get(o.b),o.o])}));return{A:c.map(a=>a.el),B}}
+function stOf(z,k){if(z.st)return z.st;const L=z.lid!=null?LL[z.lid]:LL.find(l=>l.hk===k);return L?{A:L.g.A.map(a=>a.el),B:L.g.B}:null}
+function lay(st){const n=st.A.length,p=st.A.map((_,i)=>{const r=1+i*.2,a=i*2.4;return[Math.cos(a)*r,Math.sin(a)*r]});
+ for(let it=0;it<350;it++){const f=p.map(()=>[0,0]);
+  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){const dx=p[i][0]-p[j][0],dy=p[i][1]-p[j][1],r=.12/(dx*dx+dy*dy+.01);f[i][0]+=dx*r;f[i][1]+=dy*r;f[j][0]-=dx*r;f[j][1]-=dy*r}
+  st.B.forEach(([i,j])=>{const dx=p[j][0]-p[i][0],dy=p[j][1]-p[i][1],l=Math.hypot(dx,dy)||.01,k=(l-1)*.25/l;f[i][0]+=dx*k;f[i][1]+=dy*k;f[j][0]-=dx*k;f[j][1]-=dy*k});
+  const q=.5*(1-it/400);p.forEach((v,i)=>{v[0]+=f[i][0]*q;v[1]+=f[i][1]*q})}
+ return p}
+function sSVG(st){if(!st)return'<p class="dm">Struktur belum tersedia untuk entri ini.</p>';
+ const A=st.A,big=A.length>16,hid=A.map((e,i)=>big&&e==='H'&&st.B.some(([a,b])=>(a===i&&A[b]==='C')||(b===i&&A[a]==='C'))),p=lay(st),vi=A.map((_,i)=>i).filter(i=>!hid[i]);
+ const xs=vi.map(i=>p[i][0]),ys=vi.map(i=>p[i][1]),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys),W=320,H=220,pd=26,sc=Math.min(70,(W-2*pd)/Math.max(x1-x0,.01),(H-2*pd)/Math.max(y1-y0,.01));
+ const X=i=>(W-(x1-x0)*sc)/2+(p[i][0]-x0)*sc,Y2=i=>(H-(y1-y0)*sc)/2+(p[i][1]-y0)*sc;let o=`<svg viewBox="0 0 ${W} ${H}" class="sv">`;
+ st.B.forEach(([a,b,n])=>{if(hid[a]||hid[b])return;const dx=X(b)-X(a),dy=Y2(b)-Y2(a),l=Math.hypot(dx,dy)||1,nx=-dy/l*4,ny=dx/l*4;for(let k=0;k<n;k++){const q=k-(n-1)/2;o+=`<line x1="${X(a)+nx*q}" y1="${Y2(a)+ny*q}" x2="${X(b)+nx*q}" y2="${Y2(b)+ny*q}" stroke="#B6C0E0" stroke-width="2.5" stroke-linecap="round"/>`}});
+ vi.forEach(i=>{const e=A[i],c='#'+hx(E[e].c);o+=big&&e==='C'?`<circle cx="${X(i)}" cy="${Y2(i)}" r="3" fill="${c}"/>`:`<circle cx="${X(i)}" cy="${Y2(i)}" r="${big?9:12}" fill="${c}"/><text x="${X(i)}" y="${Y2(i)}" text-anchor="middle" dy=".35em" font-size="${big?10:12}" font-weight="700" fill="#0B1020" font-family="JetBrains Mono,monospace">${e}</text>`});
+ return o+'</svg>'}
+function info(st){const A=st.A,m=A.reduce((t,e)=>t+E[e].M,0),c={};A.forEach(e=>c[e]=(c[e]||0)+1);const ord=Object.keys(c).sort((a,b)=>c[b]-c[a]),bc=[0,0,0,0],dg=A.map(()=>[]);
+ st.B.forEach(([a,b,n])=>{bc[n]++;dg[a].push(n);dg[b].push(n)});let hub=-1;A.forEach((e,i)=>{if(e==='H')return;if(hub<0||dg[i].length>dg[hub].length||(dg[i].length===dg[hub].length&&E[e].M>E[A[hub]].M))hub=i});
+ let geo='-';if(A.length===1)geo='Atom tunggal';else if(hub<0||A.length===2)geo='Linear (dua atom selalu segaris)';else{const e=A[hub],n=dg[hub].length,dbl=dg[hub].some(o=>o>1);
+  geo=`Atom pusat ${e} (${n} ikatan): `+(e==='O'&&n===2?'bengkok, sekitar 104,5°':e==='S'&&n===2?(dbl?'bengkok, sekitar 119°':'bengkok, sekitar 92°'):e==='N'&&n===3?'piramida trigonal, sekitar 107°':e==='C'&&n===4?'tetrahedral, 109,5°':e==='C'&&n===3?'trigonal planar, 120°':(e==='C'||e==='Xe')&&n===2?'linear, 180°':n===1?'terminal':n===2?'linear atau bengkok':n===3?'trigonal planar atau piramida':n===4?'tetrahedral atau segi empat planar':n===5?'bipiramida trigonal':n===6?'oktahedral':'kompleks')}
+ let dm=0;st.B.forEach(([a,b])=>{const x=ENX[A[a]],y=ENX[A[b]];if(x&&y)dm=Math.max(dm,Math.abs(x-y))});
+ const pol=!st.B.length?'-':dm<.4?`Nonpolar (ΔEN maks ${fx(dm,2)})`:dm<1.7?`Polar kovalen (ΔEN maks ${fx(dm,2)})`:`Sangat polar, bersifat ionik (ΔEN maks ${fx(dm,2)})`;
+ return[['Massa molar',fx(m,2)+' g/mol'],['Jumlah atom',A.length+' ('+ord.map(e=>E[e].n+' ×'+c[e]).join(', ')+')'],['Jumlah ikatan',st.B.length+` (${bc[1]} tunggal, ${bc[2]} rangkap dua, ${bc[3]} rangkap tiga)`],['Komposisi massa',ord.map(e=>e+' '+fx(c[e]*E[e].M/m*100,1)+'%').join(' · ')],['Bentuk molekul',geo],['Polaritas ikatan',pol]]}
+function zcard(k){const z=zoo[k],st=stOf(z,k),cols=z.cols||[0x4DF2C0];
+ return `<div class="zh">${cSVG(k,cols,84)}<div><b class="zn">${z.d[0]}</b><small>${z.d[1]} · ${z.d[2]}</small></div><button id="zcx" aria-label="Tutup"><i class="fa-solid fa-xmark"></i></button></div><h4>Struktur kimia</h4><div class="svw">${sSVG(st)}</div><h4>Data molekul</h4>${st?`<table class="it"><tr><th>Rumus</th><td>${z.d[2]}</td></tr>${info(st).map(r=>`<tr><th>${r[0]}</th><td>${r[1]}</td></tr>`).join('')}</table>`:'<p class="dm">Data detail belum tersedia.</p>'}<h4>Keterangan</h4><p>${z.d[3]}</p><button class="go" data-b="${k}"><i class="fa-solid fa-cube"></i> Bangun lagi di bangku</button>`}
+function renderZoo(){const ks=Object.keys(zoo);$('zb').innerHTML='<i class="fa-solid fa-paw"></i> Zoo ('+ks.length+')';
+ $('rail').innerHTML=`<div class='rt'>ZOO<br><small>${ks.length} makhluk</small></div>`+ks.map(k=>{const z=zoo[k],c=z.cols||[0x4DF2C0];return `<div class='zi'><button class='orb' data-k='${k}' aria-label='${z.d[0]}'>${cSVG(k,c,46)}</button><small>${z.d[0]}</small></div>`}).join('');
+ $('rail').hidden=!ks.length||railOff}
+$('rail').onclick=e=>{const b=e.target.closest('.orb');if(!b)return;const k=b.dataset.k,zc=$('zc');if(!zc.hidden&&zc.dataset.k===k){zc.hidden=true;return}zc.dataset.k=k;zc.innerHTML=zcard(k);zc.hidden=false;zc.scrollTop=0};
+$('zc').onclick=e=>{if(e.target.closest('#zcx')){$('zc').hidden=true;return}const b=e.target.closest('button[data-b]');if(!b)return;const k=b.dataset.b,z=zoo[k],st=stOf(z,k);
+ if(st){buildLib({name:z.d[0],g:{A:st.A.map(el=>({el})),B:st.B}});$('zc').hidden=true}else b.textContent='Belum bisa disusun otomatis'};
+$('zb').onclick=()=>{railOff=!railOff;renderZoo();$('zc').hidden=true};
+
+/* ===== QUIZ ===== */
+const QC=`Hydrogen|Molekul paling ringan, gas mudah terbakar, dua atomnya dihubungkan satu ikatan tunggal.
+Water|Pelarut universal berbentuk bengkok 104,5°; esnya mengapung di atas wujud cairnya.
+Hydrogen peroxide|Cairan antiseptik ringan dengan ikatan tunggal oksigen-oksigen yang lemah, mudah terurai menjadi air dan oksigen.
+Oxygen|Gas untuk bernapas; wujud cairnya biru pucat dan tertarik magnet.
+Nitrogen|Gas penyusun sekitar 78% udara, ikatan rangkap tiganya sangat kuat sehingga hampir tak bereaksi.
+Ammonia|Gas basa berbau menyengat berbentuk piramida trigonal, bahan baku pupuk.
+Hydrogen chloride|Gas tajam yang jika larut dalam air menjadi asam klorida, asam di lambung.
+Hydrogen sulfide|Gas beracun berbau telur busuk, molekulnya bengkok.
+Carbon dioxide|Gas linear yang kita hembuskan; wujud padatnya disebut es kering.
+Sulfur dioxide|Gas gunung berapi berbau menyesakkan, penyebab utama hujan asam.
+Sulfur trioxide|Oksida belerang berbentuk trigonal planar yang bereaksi dengan air membentuk asam sulfat.
+Carbon disulfide|Pelarut beracun berbentuk linear, satu karbon diapit dua belerang.
+Chlorine|Gas kuning kehijauan beracun yang dipakai mendisinfeksi air kolam.
+Fluorine|Gas diatomik paling reaktif, berwarna kuning pucat.
+Iodine|Padatan gelap yang menyublim menjadi uap ungu; larutannya dipakai sebagai antiseptik luka.
+Bromine|Satu-satunya nonlogam yang cair pada suhu kamar, berwarna cokelat kemerahan.
+Sulfuric acid|Asam kuat yang dijuluki raja bahan kimia, dipakai dalam aki mobil.
+Phosphoric acid|Asam yang memberi rasa tajam pada minuman cola dan dipakai dalam pupuk.
+Boric acid|Padatan putih antiseptik lemah untuk obat cuci mata, mengandung boron.
+Boron trifluoride|Gas dengan atom pusat boron yang kekurangan elektron, berbentuk trigonal planar.
+Sulfur hexafluoride|Gas sangat berat berbentuk oktahedral dengan enam atom fluor mengelilingi satu belerang.
+Sodium chloride|Garam dapur, senyawa ionik berbentuk kristal kubus.
+Sodium hydroxide|Basa kuat yang dijuluki soda api, bahan pembuat sabun.
+Calcium carbonate|Penyusun cangkang telur, kerang, dan marmer; berbusa jika ditetesi asam.
+Sodium bicarbonate|Soda kue, melepas gas karbon dioksida saat dipanaskan atau dicampur asam.
+Calcium oxide|Kapur tohor yang bereaksi hebat dengan air sambil melepas panas.
+Magnesium oxide|Padatan putih hasil pembakaran pita magnesium.
+Iron(III) oxide|Karat besi yang berwarna cokelat kemerahan.
+Titanium dioxide|Pigmen putih pada cat dan tabir surya, mengandung titanium.
+Zinc oxide|Serbuk putih untuk salep dan tabir surya, mengandung seng.
+Aluminum oxide|Zat sangat keras penyusun amplas, rubi, dan safir.
+Silver chloride|Padatan putih yang menghitam jika terkena cahaya, dipakai pada film foto lama.
+Sodium carbonate|Soda abu, pelunak air dan bahan pembuat kaca.
+Methane|Penyusun utama gas alam, tetrahedral dengan satu karbon dan empat hidrogen.
+Ethane|Hidrokarbon dua karbon dengan semua ikatan tunggal.
+Propane|Hidrokarbon tiga karbon, bahan bakar tabung gas LPG.
+Butane|Hidrokarbon empat karbon berantai lurus, isi korek api gas.
+Isobutane|Isomer bercabang dari butana, dipakai sebagai gas pendingin kulkas.
+Octane|Hidrokarbon delapan karbon yang menjadi patokan angka oktan bensin.
+Ethylene|Gas hormon pematang buah dengan ikatan rangkap dua karbon-karbon.
+Acetylene|Gas las dengan ikatan rangkap tiga karbon-karbon.
+Butadiene|Monomer karet sintetis dengan dua ikatan rangkap berselang-seling.
+Isoprene|Unit penyusun karet alam, lima karbon dengan dua ikatan rangkap.
+Cyclohexane|Cincin enam karbon jenuh yang berbentuk kursi.
+Benzene|Cincin enam karbon aromatik dengan ikatan rangkap berselang-seling, induk banyak senyawa aromatik.
+Toluene|Pelarut berbau cat, benzena dengan satu gugus metil.
+Styrene|Monomer plastik polistirena, benzena dengan gugus vinil.
+Phenol|Cincin benzena dengan gugus -OH, antiseptik klasik yang dulu disebut asam karbolat.
+Aniline|Benzena dengan gugus amino, bahan dasar zat warna.
+Benzaldehyde|Aldehida aromatik dengan aroma khas almond.
+Benzoic acid|Asam karboksilat aromatik yang dipakai sebagai pengawet makanan.
+Naphthalene|Dua cincin benzena yang menyatu, bahan kapur barus.
+Pyridine|Cincin aromatik enam anggota dengan satu atom nitrogen.
+Methanol|Alkohol paling sederhana dengan satu karbon, sangat beracun jika diminum.
+Ethanol|Alkohol dua karbon pada minuman beralkohol dan hand sanitizer.
+Isopropanol|Alkohol gosok dengan gugus -OH di karbon tengah.
+Ethylene glycol|Antibeku radiator, alkohol dua gugus -OH yang beracun.
+Glycerol|Alkohol tiga gugus -OH, pelembap pada sabun dan kosmetik.
+Diethyl ether|Pelarut bius klasik, dua gugus etil dijembatani satu oksigen.
+Acetone|Penghapus cat kuku, keton paling sederhana.
+Formaldehyde|Aldehida satu karbon yang dipakai mengawetkan spesimen.
+Ethyl acetate|Ester pelarut berbau buah manis yang dipakai di lem dan cat.
+Isoamyl acetate|Ester beraroma pisang.
+Acetic acid|Komponen asam cuka makanan.
+Formic acid|Asam dalam sengatan semut.
+Citric acid|Asam pada jeruk dan lemon dengan tiga gugus karboksil.
+Lactic acid|Asam yang menumpuk di otot saat olahraga berat dan ada pada yogurt.
+Oxalic acid|Asam dikarboksilat sederhana yang terdapat pada bayam.
+Malic acid|Asam yang memberi rasa asam pada apel.
+Ascorbic acid|Vitamin C.
+Urea|Zat sisa metabolisme dalam urin, juga pupuk berkadar nitrogen tinggi.
+Chloroform|Pelarut satu karbon dengan satu hidrogen dan tiga klor, dulu dipakai sebagai bius.
+Carbon tetrachloride|Pelarut tanpa hidrogen, tetrahedral simetris dengan empat klor.
+Vinyl chloride|Monomer plastik PVC.
+Ethylene oxide|Epoksida beranggota cincin tiga atom, dua karbon dan satu oksigen.
+Cyclopropane|Cincin tiga karbon yang sangat tegang.
+Sodium fluoride|Garam yang ditambahkan ke pasta gigi untuk mencegah gigi berlubang.
+Potassium iodide|Garam yodium yang melindungi kelenjar tiroid.
+Calcium chloride|Garam penyerap air yang dipakai pada pencairan es di jalan.
+Xenon difluoride|Senyawa gas mulia yang berbentuk linear dengan satu xenon dan dua fluor.
+Glycine|Asam amino paling sederhana, rantai sampingnya hanya satu hidrogen.
+Cysteine|Asam amino bergugus tiol (-SH) yang membentuk jembatan disulfida.
+Glucose|Gula darah, sumber energi utama sel.
+Sucrose|Gula pasir, gabungan glukosa dan fruktosa.
+Fructose|Gula buah yang paling manis di antara gula alami.
+Adenine|Basa nitrogen DNA yang berpasangan dengan timin.
+Thymine|Basa nitrogen yang ada di DNA tetapi digantikan urasil di RNA.
+Uracil|Basa nitrogen yang hanya ada di RNA.
+Cytosine|Basa nitrogen yang berpasangan dengan guanin.
+Caffeine|Stimulan pada kopi dan teh.
+Aspirin|Pereda nyeri turunan asam asetilsalisilat.
+Paracetamol|Obat penurun demam dengan gugus amida dan fenol.
+Ibuprofen|Obat antiradang nonsteroid turunan asam propionat.
+Vanillin|Pemberi aroma utama vanila.
+Menthol|Zat pendingin pada permen mint.
+Limonene|Aroma khas kulit jeruk.
+Capsaicin|Penyebab rasa pedas pada cabai.
+Dopamine|Neurotransmiter yang berkaitan dengan rasa senang dan motivasi.`;
+const VQN=['Water','Carbon dioxide','Methane','Ammonia','Hydrogen','Oxygen','Nitrogen','Hydrogen chloride','Hydrogen sulfide','Ethylene','Sulfur dioxide','Ethanol','Acetone','Acetic acid',null,'Glucose','Sodium chloride','Calcium carbonate','Sodium bicarbonate',null,null,null,null,'Iodine'];
+const byN={},pfc={},QB=[];LL.forEach(l=>{byN[l.name]=l;pfc[l.pf]=(pfc[l.pf]||0)+1});
+QC.split('\n').forEach(r=>{const[n,c]=r.split('|');if(byN[n]&&c)QB.push({q:c+' Molekul apakah ini?',a:byN[n]})});
+VD.forEach((r,i)=>{const n=VQN[i];if(n&&byN[n])QB.push({q:`Hasil uji lab: wujud ${r[2]}; kelarutan dalam air ${r[4]}; sifat ${r[5]}; pembakaran: ${r[7]}; bau: ${r[8]}${i?'; massa jenis: '+r[9]:''}. Zat apakah ini?`,a:byN[n]})});
+LL.forEach(l=>{if(pfc[l.pf]===1)QB.push({q:`Rumus kimia ${l.pf} adalah milik molekul…`,a:l,f:1})});
+// Keep a curated, replayable bank in the requested 100–150 range; deduplicate by prompt + answer.
+const qSeen=new Set();
+for(let i=QB.length-1;i>=0;i--){const k=QB[i].q+'|'+QB[i].a.name;if(qSeen.has(k))QB.splice(i,1);else qSeen.add(k)}
+if(QB.length>140)QB.splice(140);
+
+const qb=$('qb'),ic=(n,c='')=>`<i class="fa-solid fa-${n} ${c}"></i>`;let QS=null,qt=null,qN=10,lastC=['t',0],rec={};try{rec=JSON.parse(localStorage.getItem('mzq')||'{}')}catch(e){}rec.t=rec.t||{};rec.n=rec.n||{};
+const qsave=()=>{try{localStorage.setItem('mzq',JSON.stringify(rec))}catch(e){}};
+const mkPool=()=>QB.map(b=>({b,k:Math.random()+(b.f?.3:0)})).sort((x,y)=>x.k-y.k).map(x=>x.b);
+function mkQ(b){const A=b.a,al=A.g.A.length,c=LL.filter(l=>l!==A&&l.pf!==A.pf).map(l=>({l,s:Math.abs(l.g.A.length-al)+Math.random()*6})).sort((x,y)=>x.s-y.s).slice(0,4).map(x=>x.l),o=[A,...c].sort(()=>Math.random()-.5);return{q:b.q,o,i:o.indexOf(A),a:A}}
+function qMenu(){QS=null;clearInterval(qt);$('vx').hidden=false;$('vial').classList.remove('danger');const t=rec.t,n=rec.n;
+ qb.innerHTML=`<div class="qintro"><div class="qseal">${ic('flask-vial')}</div><div><b style="font:600 20px var(--head)">Misi identifikasi molekul</b><p>Kenali zat dari petunjuk Zoo, sifat lab, atau rumus kimianya. Pilih jawaban A–E. Saat misi aktif, seluruh kontrol laboratorium terkunci sampai hasil ditampilkan.</p><p><b>${QB.length} kartu soal</b> · diacak ulang setiap permainan</p></div></div>
+ <div class="qg"><div class="qc qmode timed"><span class="qtag">Mode tantangan</span><h3>${ic('stopwatch')} Sprint 90 detik</h3><p>Jawab sebanyak mungkin sebelum waktu habis. Pertahankan streak untuk mencetak rekor. Sepuluh detik terakhir akan masuk zona bahaya merah.</p><button class="go" data-q="t">${ic('play')} Mulai sprint</button></div>
+ <div class="qc qmode relaxed"><span class="qtag">Mode eksplorasi</span><h3>${ic('infinity')} Tanpa waktu</h3><p>Atur panjang sesi sendiri. Ada jeda untuk melihat jawaban dan mempelajari rumus yang benar.</p><div class="qn">${[10,15,20,25].map(x=>`<button class="ch ${x===qN?'sel':''}" data-n="${x}">${x} soal</button>`).join('')}</div><button class="go" data-q="n">${ic('play')} Mulai sesi</button></div></div>
+ <div class="qrecord"><h3>${ic('trophy')} Catatan laboratorium</h3><table class="it"><tr><th>Sprint 90 detik</th><td>${t.n?`benar terbanyak ${t.c}, streak ${t.s}, akurasi terbaik ${t.p}%, dimainkan ${t.n}×`:'Belum ada rekor — mulai misi pertamamu!'}</td></tr>${[10,15,20,25].map(x=>`<tr><th>${x} soal</th><td>${n[x]&&n[x].n?`akurasi terbaik ${n[x].p}%, streak ${n[x].s}, dimainkan ${n[x].n}×`:'Belum ada rekor'}</td></tr>`).join('')}</table></div>`}
+function qSt(){const S=QS,e=$('qs');if(e){e.className='sk'+(S.st>=3?' hot':'');e.innerHTML=ic('fire')+' Streak '+S.st}}
+function qShow(){const S=QS,c=S.cur,L='ABCDE';
+ qb.innerHTML=`<div class="qwarn">${ic('triangle-exclamation')} ZONA BAHAYA — WAKTU HAMPIR HABIS</div><div class="qplayhead"><span class="qcount">${S.mode==='t'?'SPRINT · TERJAWAB '+S.i:'SESI · SOAL '+(S.i+1)+' / '+S.total}</span>${S.mode==='t'?'<b id="qtm" class="tm">1:30</b>':''}<span id="qs" class="qstreak"></span></div><div class="pb"><i id="pbi" style="width:${S.mode==='t'?0:S.i/S.total*100}%"></i></div><div class="qquestion"><h2 class="qq">${c.q}</h2><div class="qos">${c.o.map((o,i)=>`<button class="qo" data-a="${i}"><b>${L[i]}</b><span>${o.name}</span></button>`).join('')}</div></div><div id="qf"></div><div class="qfbar"><span class="dm">${S.mode==='t'?'Pilih cepat, lanjut otomatis.':'Baca umpan balik sebelum lanjut.'}</span><button class="ch qx" data-q="x">${ic('flag-checkered')} Akhiri kuis</button></div>`;qSt();qTk()}
+function qTk(){const S=QS;if(!S||S.over||S.mode!=='t')return;const l=Math.max(0,S.end-Date.now()),s=Math.ceil(l/1000),e=$('qtm');if(e){e.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');e.classList.toggle('dg',s<=10)}const p=$('pbi');if(p)p.style.width=l/900+'%';$('vial').classList.toggle('danger',s<=10&&l>0);if(l<=0)qEnd()}
+function qNext(){const S=QS;if(!S||S.over)return;if(S.mode==='n'&&S.i>=S.total)return qEnd();if(S.pi>=S.pool.length){S.pool=mkPool();S.pi=0}S.cur=mkQ(S.pool[S.pi++]);S.lock=false;qShow()}
+function qStart(mode,total){lastC=[mode,total];clearInterval(qt);QS={mode,total,i:0,ok:0,bad:0,st:0,bs:0,pool:mkPool(),pi:0,end:Date.now()+90000,lock:false,over:false};$('vx').hidden=true;qNext();if(mode==='t')qt=setInterval(qTk,200)}
+function qAns(i){const S=QS;if(!S||S.over||S.lock)return;if(S.mode==='t'&&Date.now()>=S.end){qEnd();return}S.lock=true;const c=S.cur,ok=i===c.i;S.i++;if(ok){S.ok++;S.st++;S.bs=Math.max(S.bs,S.st)}else{S.bad++;S.st=0}
+ qb.querySelectorAll('.qo').forEach((b,j)=>{b.disabled=true;if(j===c.i)b.classList.add('ok');else if(j===i)b.classList.add('bad')});qSt();
+ if(S.mode==='t')setTimeout(()=>{if(QS===S&&!S.over)qNext()},ok?400:900);
+ else $('qf').innerHTML=`<div class="fb ${ok?'g':'r'}">${ic(ok?'circle-check':'circle-xmark')} ${ok?'Benar!':'Kurang tepat.'} Jawabannya <b>${c.a.name}</b> (${c.a.pf}).</div><button class="go" data-q="nx">${S.i>=S.total?'Lihat hasil':'Lanjut'}</button>`}
+function qEnd(){const S=QS;if(!S||S.over)return;S.over=true;clearInterval(qt);$('vial').classList.remove('danger');$('vx').hidden=false;
+ const tot=S.ok+S.bad,pct=tot?Math.round(S.ok/tot*100):0,RR=S.mode==='t'?rec.t:(rec.n[S.total]=rec.n[S.total]||{}),nw=[];
+ if(tot){if(S.mode==='t'&&S.ok>(RR.c||0))nw.push('jawaban benar terbanyak');if(S.bs>(RR.s||0))nw.push('streak terpanjang');if(pct>(RR.p||0))nw.push('akurasi tertinggi');
+  RR.c=Math.max(RR.c||0,S.ok);RR.s=Math.max(RR.s||0,S.bs);RR.p=Math.max(RR.p||0,pct);RR.n=(RR.n||0)+1;qsave()}
+ qb.innerHTML=`<div class="qresult"><h2>${S.mode==='t'?'Waktu habis!':'Kuis selesai!'}</h2><p class="dm">Ringkasan hasil misi identifikasi molekul.</p><div class="rg"><div><b class="gg">${S.ok}</b>Benar</div><div><b class="rr">${S.bad}</b>Salah</div><div><b>${pct}%</b>Persentase benar</div><div><b>${S.bs}</b>Streak benar terpanjang</div></div>${nw.length?`<p class="nw">${ic('trophy')} Rekor baru: ${nw.join(', ')}!</p>`:''}<p class="dm">Rekor terbaikmu di mode ini: benar ${RR.c||0}, streak ${RR.s||0}, akurasi ${RR.p||0}%.</p><div class="qn"><button class="go" data-q="again">${ic('rotate-right')} Main lagi</button><button data-q="m">${ic('list')} Menu</button></div></div>`}
+qb.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.n){qN=+b.dataset.n;qMenu();return}if(b.dataset.a!==undefined)return qAns(+b.dataset.a);const q=b.dataset.q;
+ if(q==='t')qStart('t',0);else if(q==='n')qStart('n',qN);else if(q==='nx')qNext();else if(q==='x'){if(confirm('Akhiri kuis sekarang dan lihat hasilnya?'))qEnd()}else if(q==='again')qStart(lastC[0],lastC[1]);else if(q==='m')qMenu()};
+addEventListener('keydown',e=>{if(!QS||QS.over||$('vial').hidden||e.key.length!==1)return;const i='abcde'.indexOf(e.key.toLowerCase());if(i>=0)qAns(i)});
+addEventListener('beforeunload',e=>{if(QS&&!QS.over){e.preventDefault();e.returnValue=''}});
+$('vx').onclick=()=>{if(!QS||QS.over)$('vial').hidden=true};
+$('vb').onclick=()=>{$('vial').hidden=false;if(!QS||QS.over)qMenu()};
+const cn=el=>atoms.filter(a=>a.el===el).length;
+const TS=[
+ {t:'Selamat datang!',p:'Ini bangku 3D. Di sini kamu merakit molekul dari atom, memanaskannya, lalu menetaskannya jadi makhluk. Tutorial singkat ini mengajakmu mencobanya langsung.',nx:'Mulai'},
+ {t:'1. Ambil atom',sel:'#shelf',p:'Ini rak atom. Ketuk O satu kali dan H dua kali untuk memunculkan atomnya di bangku.',pre:()=>clearAll(),done:()=>cn('O')>=1&&cn('H')>=2,help:()=>{clearAll();['O','H','H'].forEach(spawn)}},
+ {t:'2. Tempelkan atom',p:'Tarik satu hidrogen sampai dekat oksigen, lalu lepas. Ulangi dengan hidrogen kedua. Geser di ruang kosong untuk memutar kamera.',done:()=>cur&&cur.sat&&bonds.length>=2&&cur.key==='H2O',help:()=>build('H2O')},
+ {t:'3. Rumus dan nama',sel:'#hud',p:'Di sini muncul rumus dan nama molekulmu. H₂O artinya air (Water).',nx:'Lanjut'},
+ {t:'4. Hatch!',sel:'#hatch',p:'Molekul yang lengkap bisa menetas jadi makhluk. Tekan Hatch.',done:()=>alive,help:()=>$('hatch').click()},
+ {t:'5. Zoo',sel:'#rail',p:'Makhluk yang menetas tinggal di Zoo, di sisi kiri layar. Ketuk satu untuk melihat kartunya, dan tekan "Bangun lagi" untuk merakitnya ulang. Zoo adalah koleksimu.',nx:'Lanjut'},
+ {t:'6. Panaskan',sel:'#bar',p:'Tekan Run, lalu geser Heat ke kanan. Heat adalah suhu simulasi: atom bergetar dan berpijar, ikatan memerah, dan pada suhu tinggi ikatan yang lemah putus sehingga molekul terurai.',done:()=>running,help:()=>$('run').click()},
+ {t:'7. Semua 118 elemen',sel:'#ptb',p:'Tabel Periodik berisi seluruh elemen, dikelompokkan per keluarga. Tekan untuk membuka lacinya.',pre:()=>{if(running)$('run').click()},done:()=>!$('rack').hidden,help:()=>openRack(true)},
+ {t:'8. Katalog molekul',sel:'#ctb',p:'Ada 155 molekul yang bisa disusun otomatis. Tekan Katalog untuk melihatnya.',pre:()=>openRack(false),done:()=>!$('cat').hidden,help:()=>openCat(true)},
+ {t:'9. Quiz Molekul',sel:'#vb',p:'Kuis pilihan ganda A sampai E tentang molekul, dengan waktu 1 menit 30 detik atau tanpa waktu. Coba nanti setelah tutorial.',pre:()=>openCat(false),nx:'Mengerti'},
+ {t:'Selesai!',p:'Itu semua yang perlu kamu tahu. Bangku kosong siap kamu pakai. Tombol ? di bawah memutar tutorial ini lagi.',nx:'Mulai bermain'}];
+let ti=-1,tint=null;
+function tmark(v){try{localStorage.setItem('mztut',v)}catch(e){}}
+function tend(v){clearInterval(tint);$('tut').hidden=true;tmark(v);openRack(false);openCat(false);if(v==='skip')startPlay();else{clearAll();tip('Bangku siap. Pilih atom di rak, atau buka Katalog untuk contoh.')}}
+function tpos(s){const sp=$('sp'),tc=$('tc');let top=false;
+ const el=s.sel&&document.querySelector(s.sel);
+ if(el&&!el.hidden){const r=el.getBoundingClientRect();sp.style.display='';sp.style.left=r.left-6+'px';sp.style.top=r.top-6+'px';sp.style.width=r.width+12+'px';sp.style.height=r.height+12+'px';top=r.top+r.height/2>innerHeight*.5}
+ else if(s.sel){sp.style.display='none'}
+ else{sp.style.display=s.done?'none':'';sp.style.left='50%';sp.style.top='45%';sp.style.width='0';sp.style.height='0';top=!!s.done}
+ if(top){tc.style.top='calc(12px + env(safe-area-inset-top,0px))';tc.style.bottom='auto'}else{tc.style.bottom='calc(12px + env(safe-area-inset-bottom,0px))';tc.style.top='auto'}}
+function tshow(i){clearInterval(tint);ti=i;const s=TS[i];$('tut').hidden=false;$('ts').textContent=(i+1)+' / '+TS.length;$('tt').textContent=s.t;$('tp').textContent=s.p;
+ if(s.pre)s.pre();$('tnx').hidden=!!s.done;$('tnx').textContent=s.nx||'Lanjut';$('thp').hidden=!s.help;$('tsk').hidden=i===TS.length-1;let ok=false;
+ const go=()=>{tpos(s);if(s.done&&!ok&&s.done()){ok=true;clearInterval(tint);$('tt').innerHTML=s.t+' <i class="fa-solid fa-circle-check"></i>';setTimeout(()=>tshow(i+1),900)}};go();tint=setInterval(go,300)}
+$('tnx').onclick=()=>{if(ti>=TS.length-1)tend('done');else tshow(ti+1)};
+$('tsk').onclick=()=>tend('skip');$('thp').onclick=()=>{TS[ti].help()};
+$('hb').onclick=()=>{openRack(false);openCat(false);$('vial').hidden=true;tshow(0)};
+addEventListener('resize',()=>{if(ti>=0&&!$('tut').hidden)tpos(TS[ti])});
+let TUT=null;try{TUT=localStorage.getItem('mztut')}catch(e){}
+setTimeout(()=>{$('hero').style.opacity=0;setTimeout(()=>{$('hero').hidden=true},400);if(TUT)startPlay();else tshow(0)},TUT?1600:3500);
+// hero molecule
+const o0=addAtom('O',new THREE.Vector3(0,0,0)),h1=addAtom('H',new THREE.Vector3(.7,.5,0)),h2=addAtom('H',new THREE.Vector3(-.7,.5,0));mkBond(o0,h1);mkBond(o0,h2);refresh();renderZoo();
+function tick(t){requestAnimationFrame(tick);if(!P.size&&!calm)th+=.0018;
+ physics();updBonds();glow();
+ cam.position.set(rad*Math.sin(ph)*Math.sin(th),rad*Math.cos(ph),rad*Math.sin(ph)*Math.cos(th));cam.lookAt(0,0,0);
+ const bl=(t%3500)<120;eyes.forEach(g=>{g.lookAt(cam.position);(g.userData.eg||g).scale.y=bl?.1:1});
+ if(!calm)dust.rotation.y+=.0004;R.render(S,cam)}
+requestAnimationFrame(tick);
+})();
+</script>
+</body></html>
